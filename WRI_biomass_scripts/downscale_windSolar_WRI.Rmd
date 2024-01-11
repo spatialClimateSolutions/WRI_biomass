@@ -33,32 +33,30 @@ library(egg)
 # install.packages("stringi", dependencies=TRUE, INSTALL_opts = c('--no-lock'))
 ```
 
-Pseudo-code:
+Pseudo-code/outline
 1. input parameters and set folder paths
 2. import data
     a. import bins/mergedCPAs (csv) as df
     b. import RIO portfolios/results (capacity) (csv) as df
     c. import prediction values for each UNIQUEID CPA (csv) as df
-3a Get prediction value of each CPA <-- do this in python (create multi-tech CPA script)
-    a. project random forest rasters
-    b. Create a numeric field of unique IDs for rasterizing
-    c. convert to raster
-    d. Fix extent
-    e. get average prediction value for each CPA (using zonal stats, with CPAs as zones and pg as raster input) as a data frame
-3b. join prediction values dataframe to the bins/mergedCPAs df
-    a. add column and calculate the average wind/solar score for colocation/trilocation
-4. Select CPAs for each scenario
+3a Get prediction value of each CPA
+    a. project prediction surface rasters
+    b. Fix extent
+    c. get average prediction value for each CPA (using zonal stats, with CPAs as zones and pg as raster input) as a data frame
+3b. Join prediction values dataframe to the RIO bins/mergedCPAs df
+4. Prep the technology, zone, scenario, bin lists for looping and subset the RIO capacity results df
+5. Select CPAs for each scenario
     a. SORT CPAS BY PREDICTION SCORE FOR EACH BIN FOR EACH REGION; for each unique scenario and year combination, select the CPAs
         i. This selected df needs to have the uniqueid and tech
-    b. save as csv
-        i. import in python and select polygons from mergedCPA feature class using select query for each tech (create separate feature class per technology)
+    b. Select the CPAs from the CPA shapefiles and save select CPAs shapefile. 
     
 ########################################
-# STEP 1. INPUT PARAMETERS FOR EACH TECH AND SET FOLDER PATHS
+# STEP 1. INPUT PARAMETERS AND SET FOLDER PATHS
+
 ```{r}
 ## NOTE: currently programmed to select the highest scores first within each bin
 sortBy <- "highest" # "lowest" (for LCOE); "highest" for random forest and other machine learning prediction
-year.list <- c(2035, 2050) #unique(rio_sub$year)
+year.list <- c(2035, 2050)
 
 ## main google shared folder path:
 google_fp <- "/Users/grace/Library/CloudStorage/GoogleDrive-gracecwu@ucsb.edu/My Drive/Research_Projects/WRI_biomass"
@@ -73,9 +71,10 @@ rf_field_wind <- "rf_pl_wind"
 
 ## outputs folder:
 outputsFolder <- "../outputs/csvs_011024/"
-outputsFolder_shp <- "../outputs/shp_011024/"
-outputsFolder <- file.path(google_fp, "Downscaling/script_outputs/csvs_011024/")
-outputsFolder_shp <- file.path(google_fp, "Downscaling/script_outputs/shp_011024/")
+outputsFolder_shp <- "../outputs/shp_011024/" ## if we need to write this output locally for plotting in ArcGIS
+outputsFolder <- file.path(google_fp, "Downscaling_windSolar/downscaling_outputs/csvs_011024/")
+outputsFolder_shp <- file.path(google_fp, "Downscaling_windSolar/downscaling_outputs/shp_011024/")
+
 ## list of CPA attributes to keep in output shapefile
 keepFieldsList <- c("ID", "STATE_sub", "tot_txCost", "UNIQUEID", "CF_wind", "CF_fixed", "CF_track", "env_wind_i10", "env_PV_i10", "env_APV", "soc_PV", "soc_wind", "soc_APV", "spur_tx_cost", "rf_PV", "rf_wind", "rf_both", "pov", "unemp", "minrty", "nohsdp", "tech") # + SCENARIO!
 keepFieldsList <- c("ID", "STATE_sub", "tot_txCost", "UNIQUEID", "CF_wind", "CF_fixed", "CF_track", "env_wind_i10", "env_PV_i10", "env_APV", "soc_PV", "soc_wind", "spur_tx_cost", "rf_PV", "rf_wind", "rf_both", "tech") # + SCENARIO!
@@ -83,12 +82,13 @@ keepFieldsList <- c("ID", "STATE_sub", "tot_txCost", "UNIQUEID", "CF_wind", "CF_
 ```
 
 ########################################
-# STEP 2: Import prediction surfaces, RIO bins csv, RIO results csv, merged CPA as shapefile and raster
+# STEP 2: READ prediction surfaces, RIO bins csv, RIO results csv, merged CPA as shapefile and raster
+
 ```{r}
 #######################
 # IMPORT PREDICTION SURFACES
 
-## placeholder for prediction surfaces 
+## ******* PLACEHOLDER for prediction surface file paths
 # pred_PV <- read.csv(file.path(google_fp, "Downscaling/downscaling_inputs/Wind_solar_predictionSurfaces/XXXX.csv"))
 
 # pred_wind <- read.csv(file.path(google_fp, "Downscaling/downscaling_inputs/Wind_solar_predictionSurfaces/XXXX.csv")) 
@@ -120,11 +120,11 @@ CPA_3 <- st_read(file.path(popNat_google_fp, "CPA_GISfiles/merged_CPA_focalStats
 #spurs_2 <- st_read(paste0("../../../SupplyCurveAnalysis/Tx/", leastCostPath_folderName, "/LCP_costing_mergedSubID_1200001_plus.shp"), stringsAsFactors = FALSE)
 
 # Read the feature class from geodatabase
-fgdb = paste0("../../../SupplyCurveAnalysis/Tx/", leastCostPath_folderName,  "/outPaths_115_increments.gdb")
-fc_list = ogrListLayers(fgdb) 
-print(fc_list) 
-#spurs = readOGR(dsn=fgdb,layer= "LCP_costing_mergedSubID") 
-spurs = st_read(fgdb, "LCP_costing_mergedSubID") 
+# fgdb = paste0("../../../SupplyCurveAnalysis/Tx/", leastCostPath_folderName,  "/outPaths_115_increments.gdb")
+# fc_list = ogrListLayers(fgdb) 
+# print(fc_list) 
+# #spurs = readOGR(dsn=fgdb,layer= "LCP_costing_mergedSubID") 
+# spurs = st_read(fgdb, "LCP_costing_mergedSubID") 
 
 ## Import SVI attributes
 #SVI_CPA_df <- read.csv("../../../SupplyCurveAnalysis/attributeData/", zonalStats_folderName, "/SVI2020.csv")
@@ -136,7 +136,8 @@ CPAs_ras <- raster(file.path(popNat_google_fp, "CPA_GISfiles/merged_CPA_focalSta
 ```
 
 ########################################
-# STEP 3b: join prediction values to binned df and calculate mean prediction score for colocation (wind and solar)
+# STEP 3a: GET AVERAGE PREDICTION SCORE PER CPA (ZONAL STATS)
+
 ```{r}
 ######################################
 ## Zonal stats for prediction surfaces
@@ -156,48 +157,53 @@ fixExtent <- function(template, in_ras){
   return(in_ras_mask)
 }
 
+## **** PLACEHOLDER: need to reproject predPV and predWind to same projection as CPAs_ras
+
+## Get df of prediction scores by CPA - PV
 predPV.ras.fixed <- fixExtent(CPAs_ras, pred_PV)
 predPV_CPA_df <- as.data.frame(zonal(x = predPV.ras.fixed, z = CPAs_ras, fun ='mean', na.rm = TRUE))
 
+## Get df of prediction scores by CPA - PV
 predWind.ras.fixed <- fixExtent(CPAs_ras, pred_PV)
 predWind_CPA_df <- as.data.frame(zonal(x = predWind.ras.fixed, z = CPAs_ras, fun ='mean', na.rm = TRUE))
 
-
-## filter rio bin rows to onshore wind and solar using uniqueID
-rio_bins <- rio_bins %>% 
-  drop_na(UNIQUEID)
-
-nrow(rio_bins)
-
-## join the random forest prediction values and the SVI zonal stats attributes
-rio_bins <- rio_bins %>% 
-  select(-c(rf_PV, rf_wind)) %>% ## drop old prediction values
-  rename(STATE_sub = STATE) %>%
-  left_join(pred_PV, by = c("UNIQUEID"= "UNIQUEID")) %>%
-  left_join(pred_wind, by = c("UNIQUEID"= "UNIQUEID")) #%>%
-  #left_join(SVI_CPA_df, by = c("UNIQUEID"= "UNIQUEID"))
-
-## determine how many CPAs have no prediction values
-rio_bins_pred <- rio_bins %>% 
-  drop_na(rf_PV)
-
-print(paste("Number of CPAs missing prediction values:", toString(nrow(rio_bins) - nrow(rio_bins_pred))))
-
-rm(rio_bins, pred_PV, pred_wind)
-
-rio_bins_pred <- rio_bins_pred %>% 
-  mutate(rf_both = rowMeans(select(rio_bins_pred, c(rf_PV, rf_wind)), na.rm = TRUE))
-
-## calculate new total capacity fields for colocation and trilocation:
-rio_bins_pred <- rio_bins_pred %>% 
-  mutate(MW_CO_tot = MW_CO_wi_1*3) #%>% ##1:2 ratio of capacity wind:solar, therefore wind x3 = total capacity
-  #mutate(MW_tri_tot = rowSums(select(rio_bins_pred, c(MW_CO_fi_1, MW_CO_wi_1)), na.rm = TRUE))
+## **** PLACEHOLDER: make sure there's a UNIQUEID field in the resulting df, if not, rename the zone column
 
 ```
 
 
 ########################################
-# STEP 4: Prep the lists for looping and subset the rio results df
+# STEP 3b: join prediction scores to RIO binned df
+
+```{r}
+######################################
+## Join prediction scores df to RIO bins df
+
+## filter rio bin rows to onshore wind and solar using uniqueID
+rio_bins <- rio_bins %>% 
+  drop_na(UNIQUEID)
+nrow(rio_bins)
+
+## join the prediction values to RIO bins 
+rio_bins <- rio_bins %>% 
+  select(-c(rf_PV, rf_wind)) %>% ## drop old prediction values
+  rename(STATE_sub = STATE) %>%
+  left_join(pred_PV, by = c("UNIQUEID"= "UNIQUEID")) %>%
+  left_join(pred_wind, by = c("UNIQUEID"= "UNIQUEID"))
+
+## drop CPA rows that have no prediction values
+rio_bins_pred <- rio_bins %>% 
+  drop_na(rf_PV)
+
+print(paste("Number of CPAs missing prediction values:", toString(nrow(rio_bins) - nrow(rio_bins_pred))))
+
+## delete objects that are no longer needed and take up a lot of memory
+rm(rio_bins, pred_PV, pred_wind)
+```
+
+
+########################################
+# STEP 4: Prep the technology, zone, scenario, bin lists for looping and subset the RIO capacity results df
 ```{r}
 ## get list of zones, bin numbers, and scenarios
 zone.list <- unique(rio_bins_pred$gau)
@@ -207,10 +213,11 @@ tech.list <- unique(rio_cap$tech..outputs_group_aggregate)
 colnames(rio_cap)
 year.list <- unique(rio_cap$year)
 #tech.list.select <- c("fixed pv+agriculture", "fixed pv+wind+agriculture","wind+tracking pv","onshore wind", "fixed pv", "tracking pv")
-tech.list.select <- c("fixed pv+agriculture", "wind+tracking pv","onshore wind", "fixed pv", "tracking pv")
+#tech.list.select <- c("fixed pv+agriculture", "wind+tracking pv","onshore wind", "fixed pv", "tracking pv")
+#tech.list.select <- c("wind+tracking pv","onshore wind", "fixed pv", "tracking pv")
 
-  ## postprocess rio results (capacity) to filter by technology and isolate the bins from the technology
-# filter rio results to technology and create column with just the bin numbers
+# postprocess RIO capacity results to filter by technologies we're downscaling and isolate the bins from the technology (which are in the same column)
+## filter RIO results to technology.list.select and create column with just the bin numbers
 rio_cap_sub <- rio_cap %>%
   ## select just onshore wind (need to replace the subscript with space)
   filter(tech..outputs_group_detailed %in% tech.list.select) %>%
@@ -234,13 +241,14 @@ rio_cap_sub_noVal <- rio_cap_sub %>%
   select(-value)
 #test <- rio_cap_sub_noVal[duplicated(rio_cap_sub_noVal),]
 
-## filter
+## check filter
 filteredRows = rio_cap_sub %>%
   filter(run.name == "100p", year == "2027", technology == "onshore wind", zone == "central great plains_emm", bin_number == "1")
 ```
 
 
 ## rules for technology combinations and corresopnding selected technology
+POP NATIONAL SETUP: 
 tech_combo_group or the CPA flags (bins)     |   technology (results)
 "solar+agriculture"  --->  "fixed pv+agriculture"
 "solar+wind+agriculture" --->  "fixed pv+wind+agriculture"
@@ -253,13 +261,21 @@ Run in order:
 
 For each technology in the results (rio_cap_sub), subset the supply curve (rio_bins_pred), removing previously selected CPAs as necessary
 
+WRI SETUP: 
+- Treat all wind+tracking pv as onshore wind
+- Treat all fixed pv as tracking pv
+- Remove all agrivoltaic areas
+
 ########################################
-# STEP 5: CREATE NEW FIELDS FOR EACH SCENARIO AND YEAR COMBINATION IN CPA FC WITH VALUE = 1 IF CPA IS SELECTED
+# STEP 5: SELECT CPAS FOR EACH SCENARIO AND YEAR COMBO
+
+hold over from last script: CREATE NEW FIELDS FOR EACH SCENARIO AND YEAR COMBINATION IN CPA FC WITH VALUE = 1 IF CPA IS SELECTED
 ```{r}
 ## FOR TESTING THE BELOW CODE
 #zone <- "montana"#"new mexico"
 #bin <- 1
 #scenario <- "high elec level 1"
+
 year.list = c(2050)
 yr = 2035
 
@@ -720,6 +736,7 @@ nohsdp_df <- rio_bins_pred_SVI %>%
 
 
 ```
+
 ## One-time code
 ```{r}
 rio_bins_pred_sub <- select(rio_bins_pred, any_of(c(keepFieldsList)))
