@@ -64,10 +64,10 @@ popNat_google_fp <- "/Users/grace/Library/CloudStorage/GoogleDrive-gracecwu@ucsb
 
 rioResultsFolder_fp <- file.path(google_fp, "RIO_data/PreliminaryResults")
 #mergedCPAs_folderName <- "mergedCPAs_focalStats_v2"
-zonalStats_folderName <- "zonalStatsCSVs_focalStats_v2"
-leastCostPath_folderName <- "leastCostPath_focalStats_v2"
-rf_field_PV <- "rf_pl_PV"
-rf_field_wind <- "rf_pl_wind"
+# zonalStats_folderName <- "zonalStatsCSVs_focalStats_v2"
+# leastCostPath_folderName <- "leastCostPath_focalStats_v2"
+# rf_field_PV <- "rf_pl_PV"
+# rf_field_wind <- "rf_pl_wind"
 
 ## outputs folder:
 outputsFolder <- "../outputs/csvs_011024/"
@@ -248,6 +248,7 @@ filteredRows = rio_cap_sub %>%
 
 
 ## rules for technology combinations and corresopnding selected technology
+
 POP NATIONAL SETUP: 
 tech_combo_group or the CPA flags (bins)     |   technology (results)
 "solar+agriculture"  --->  "fixed pv+agriculture"
