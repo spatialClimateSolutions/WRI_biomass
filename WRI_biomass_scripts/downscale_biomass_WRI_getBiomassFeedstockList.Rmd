@@ -1,0 +1,119 @@
+---
+title: "downscale_biomass_WRI_getBiomassFeedstockList"
+author: "Grace wu"
+date: "2024-01-18"
+output: html_document
+---
+Purpose: This script generates a csv of all biomass feedstocks and their categories for the WRI biomass study
+
+# Load data and set file paths
+```{r setup, include=FALSE}
+# INPUTS
+
+## main google shared folder path:
+google_fp <- "/Users/grace/Library/CloudStorage/GoogleDrive-gracecwu@ucsb.edu/My Drive/Research_Projects/WRI_biomass"
+
+## RIO results folder
+rioResultsFolder_fp <- file.path(google_fp, "RIO_data/PreliminaryResults")
+
+runs_key_df <- read.csv(file.path(rioResultsFolder_fp, "runs_key.csv"))
+
+# OUTPUTS
+outputsFolder <- file.path(google_fp, "Downscaling_biomass/intermediateFiles/")
+```
+
+# Parse runs_key_df
+```{r}
+runs_key_select_df <- 
+  ## parse feedstock from data type
+  runs_key_df %>% separate(sensitivity_key, c("dataType", "feedstock"), sep = "--") %>%
+  ## select only commodity_potential
+  filter(dataType == "COMMODITY_POTENTIAL") %>%
+  ## select only biomass feedstocks that are in the three supply curve sources 
+  filter(ira %in% c("ICCT x2 [d]", "BTS [d]", "min_cropland_change (llnl)", "3x expanded corn"))
+
+unique(runs_key_select_df["ira"])
+View(runs_key_select_df)
+```
+
+# Categorize feedstocks
+```{r}
+unique(runs_key_select_df$feedstock)
+
+herbaceousList <- c("energy cane", "existing herbaceous biomass", "miscanthus", "switchgrass", "corn", "biomass sorghum")
+oilsList <- c("Canola oil", "Corn oil",  "Soybean oil")
+nonForestryResidueWasteList <- c("beef ", "citrus residues", "construction & demolition waste", "corn stover", "cotton gin trash", "cotton residue", "dairy", "existing waste biomass", "landfill gas", "municipal solid waste wood", "non food biogenic msw", "non-residential food waste", "noncitrus residues", "other municipal solid waste", "residential food waste", "rice hulls", "sorghum stubble", "sugarcane trash", "swine", "sugarcane bagasse", "tree nut residues", "yard trimmings", "textiles", "oats straw", "rice straw", "wheat straw", "barley straw")
+forestryWasteList <- c("hardwood, lowland logging residues", "hardwood, upland logging residues", "mixedwood logging residues", "other forest residue", "other forest thinnings", "primary mill residue", "secondary mill residue", "softwood, natural logging residues", "softwood, planted logging residues")
+woodyList <- c("eucalyptus", "existing woody biomass", "hardwood, lowland whole trees", "hardwood, upland whole trees", "mixedwood whole trees", "pine", "pnw foretry 1", "pnw foretry 2", "pnw foretry 3", "pnw foretry 4", "pnw foretry 5", "pnw foretry 6", "poplar", "softwood, natural whole trees", "softwood, planted whole trees", "willow")
+  
+
+runs_key_select_cat_df <- runs_key_select_df %>%
+  mutate(category = case_when(
+  feedstock %in% herbaceousList ~ "Herbaceous",
+  feedstock %in% woodyList ~ "Woody",
+  feedstock %in% nonForestryResidueWasteList ~ "Non-forestry waste and residues",
+  feedstock %in% forestryWasteList ~ "Forestry waste and residues",
+  feedstock %in% oilsList ~ "Oils",
+  .default = "Other"
+)) %>%
+  relocate(category, .after = dataType) %>%
+  select(-dataType)
+
+View(runs_key_select_cat_df)
+```
+
+# Export as csv
+```{r}
+write.csv(runs_key_select_cat_df, file.path(outputsFolder, "biomassFeedstocksAndCategories_byScenario.csv"), row.names = FALSE)
+```
+
+
+# Check overlap of feedstock names with supply and demand inputs
+## Import all supply and demand inputs
+```{r}
+BTS_df <- read.csv(file.path(rioResultsFolder_fp, "commodity_potential.csvd/biomass.csv"))
+oils_df <- read.csv(file.path(rioResultsFolder_fp, "commodity_potential.csvd/fats_oil_grease.csv"))
+llnl_df <- read.csv(file.path(rioResultsFolder_fp, "commodity_potential.csvd/potential_min_cropland_change.csv"))
+demand_df <- read.csv(file.path(rioResultsFolder_fp, "direct_flows_y.csv"))
+```
+
+## Check BTS overlap  
+```{r}
+head(BTS_df)
+## feedstocks in master list not in BTS df:
+unique(runs_key_select_cat_df$feedstock)[!(unique(runs_key_select_cat_df$feedstock) %in% unique(BTS_df$name))]
+
+## feedstocks in BTS df not in master list:
+unique(BTS_df$name)[!(unique(BTS_df$name) %in% unique(runs_key_select_cat_df$feedstock))]
+```
+
+## Check oils overlap  
+```{r}
+head(oils_df)
+## feedstocks in master list not in oils df:
+unique(runs_key_select_cat_df$feedstock)[!(unique(runs_key_select_cat_df$feedstock) %in% unique(oils_df$name))]
+
+## feedstocks in oils df not in master list:
+unique(oils_df$name)[!(unique(oils_df$name) %in% unique(runs_key_select_cat_df$feedstock))]
+```
+
+## Check llnl_df overlap  
+```{r}
+head(llnl_df)
+## feedstocks in master list not in llnl_df:
+unique(runs_key_select_cat_df$feedstock)[!(unique(runs_key_select_cat_df$feedstock) %in% unique(llnl_df$name))]
+
+## feedstocks in llnl_df not in master list:
+unique(llnl_df$name)[!(unique(llnl_df$name) %in% unique(runs_key_select_cat_df$feedstock))]
+```
+
+
+## Check demand_df overlap  
+```{r}
+head(demand_df)
+## feedstocks in master list not in demand_df:
+unique(runs_key_select_cat_df$feedstock)[!(unique(runs_key_select_cat_df$feedstock) %in% unique(demand_df$from))]
+
+## feedstocks in demand_df not in master list:
+unique(demand_df$from)[!(unique(demand_df$from) %in% unique(runs_key_select_cat_df$feedstock))]
+```
