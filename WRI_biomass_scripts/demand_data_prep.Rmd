@@ -1,0 +1,123 @@
+---
+title: "Demand Side Data Preparation"
+author: "Henry Strecker"
+date: "January 2024"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readxl)
+library(janitor)
+```
+
+
+## Joining county names and fips, parsing state and county
+```{r}
+zone_mapping <- read_xlsx(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/RIO_data/PreliminaryResults', 'zone mapping.xlsx'))
+county_zone <- zone_mapping[1:4]
+county_fips <- zone_mapping[8:9] %>% rename(county = name) %>% drop_na()
+
+# Here all of the counties have been joined with their appropriate fips
+zone_mapped <- left_join(county_zone, county_fips, by = 'county')
+
+# Parse county column to get state and county values
+parsed_state_county <- str_split(zone_mapped$county, ', ')
+
+# Initialize lists
+county_list <- c()
+state_list <- c()
+
+# Cycle through all output strings and add them to new objects
+for (i in 1:length(parsed_state_county)){
+  county_list <- c(county_list, parsed_state_county[[i]][1]) # extract and append state names
+  state_list <- c(state_list, parsed_state_county[[i]][2])
+}
+
+#Assign new parsed values to their respective columns
+zone_mapped <- zone_mapped %>%
+  clean_names() %>%
+  mutate(county = county_list,
+         state = state_list) %>%
+  select(fips, county, state, zone, sqmi, households_2010_complete_count) %>%
+  filter(!state %in% c('puerto rico', 'quebec (state)')) # Filter out regions with zero sqmi
+
+# Counties that have area in multiple zones with the count of zones they're contained in
+county_zone_repeats <- data.frame(table(zone_mapped$county)[table(zone_mapped$county)>1])
+
+# Create and save data for counties that span multiple zones
+overlapped <- zone_mapped[zone_mapped$county %in% county_zone_repeats$Var1,] %>% arrange(county)
+#write.csv(overlapped, 'C:/Users/Hank1/Documents/BREN/WRI_biomass/WRI_biomass_scripts/county_zone_overlap.csv')
+```
+
+## Generating zone overlap proportions for both counties and states
+```{r}
+# Get values for total areas and overlapping areas
+state_areas <- zone_mapped %>% group_by(state) %>% summarize_at('sqmi', sum)
+county_areas <- zone_mapped %>% group_by(state, county) %>% summarize_at('sqmi', sum)
+state_zone_overlap_sum <- zone_mapped %>% group_by(state, zone) %>% summarize_at('sqmi', sum)
+
+# Initialize lists to be filled with area overlap percentages
+county_zone_overlap_prop <- c()
+state_zone_overlap_prop <- c()
+
+for (i in 1:dim(zone_mapped)[1]){
+  # Save current iteration values for use below
+  current_county = zone_mapped$county[i]
+  current_state = zone_mapped$state[i]
+  current_zone = zone_mapped$zone[i]
+  
+  # Divide county area in current zone by the corresponding county's total area
+  county_zone_overlap_prop <- c(county_zone_overlap_prop, 
+                                zone_mapped$sqmi[i]/filter(county_areas, (state == current_state) & (county == current_county))$sqmi)
+  # Divide state area in the current zone by the corresponding state's total area
+  state_zone_overlap_prop <- c(state_zone_overlap_prop, 
+                               filter(state_zone_overlap_sum, (state == current_state) & (zone == current_zone))$sqmi/filter(state_areas, state == current_state)$sqmi)
+}
+
+# Write proportion data to new variables
+zone_mapped <- zone_mapped %>%
+  mutate(county_area_prop = county_zone_overlap_prop,
+         state_area_prop = state_zone_overlap_prop)
+
+# Checks that every unique county has a proportion that adds up to 1
+unique(zone_mapped %>% group_by(state, county) %>% summarize_at('county_area_prop', sum) %>% arrange(-county_area_prop) %>% ungroup() %>% select(county_area_prop))
+# If you want to check at the state level, compare values of state_areas, state_zone_overlap_sum, and zone_mapped
+```
+
+
+## Categorizing direct flows energy categories and converting units
+```{r}
+# Read in demand and category data
+commodity_use <- read.csv(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/RIO_data/PreliminaryResults/commodity_use_y.csv'))
+biomass_feedstocks <- read.csv(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/Downscaling_biomass/intermediateFiles/biomassFeedstocksAndCategories_byScenario.csv'))
+
+# Select only feedstocks we're interested in and add category variable
+commodity_use <- commodity_use %>%
+  filter(commodity %in% unique(biomass_feedstocks$feedstock)) %>%
+  left_join(biomass_feedstocks %>% select(commodity = feedstock, category), by = 'commodity')
+
+# Create columns to categorize feed stocks for use in converting GWh or hectotonnes to tons
+commodity_use <- commodity_use %>%
+  mutate(
+    energy_category = case_when( # Potential for change here based on updates made to broader categories
+      category == 'Woody' | category == 'Forestry waste and residues' ~ 'Forestry',
+      commodity == 'landfill gas' ~ 'Landfill gas',
+      TRUE ~ 'Other'),  # Default value if none of the conditions match
+    tons = case_when(
+      unit == 'hectotonne' ~ value*100,
+      energy_category == 'Forestry' ~ value*3600/19,
+      energy_category == 'Landfill gas' ~ value*3600/26.1,
+      TRUE ~ value*3600/15
+    )
+  )
+
+```
+
+## Final step to join zone demand and feedstocks
+```{r}
+direct_flow_county <- merge(zone_mapped, commodity_use, by='zone')
+#write.csv(direct_flow_county, 'C:/Users/Hank1/Documents/BREN/WRI_biomass/WRI_biomass_scripts/commodity_flow_y_county_level.csv')
+```

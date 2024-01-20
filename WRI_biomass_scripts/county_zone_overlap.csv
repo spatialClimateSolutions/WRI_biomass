@@ -1,0 +1,311 @@
+"","county","zone","sqmi","households 2010 (complete count)","fips"
+"1","acadia, louisiana","mississippi delta_emm",516,18608,22001
+"2","acadia, louisiana","southern great plains_emm",117,4233,22001
+"3","adams, mississippi","mississippi delta_emm",29,734,28001
+"4","adams, mississippi","southeast_emm",463,11909,28001
+"5","allen, louisiana","mississippi delta_emm",563,6262,22003
+"6","allen, louisiana","southern great plains_emm",203,2254,22003
+"7","amite, mississippi","mississippi delta_emm",63,461,28005
+"8","amite, mississippi","southeast_emm",670,4890,28005
+"9","attala, mississippi","mississippi delta_emm",159,1667,28007
+"10","attala, mississippi","southeast_emm",94,980,28007
+"11","attala, mississippi","tennessee valley_emm",474,4972,28007
+"12","avery, north carolina","carolinas_emm",65,1805,37011
+"13","avery, north carolina","tennessee valley_emm",176,4859,37011
+"14","avoyelles, louisiana","mississippi delta_emm",302,5346,22009
+"15","avoyelles, louisiana","southern great plains_emm",569,10086,22009
+"16","baker, florida","florida_emm",82,1206,12003
+"17","baker, florida","southeast_emm",512,7566,12003
+"18","baltimore, maryland","mid-atlantic_emm",719,566618,24005
+"19","baltimore, maryland","mid-atlantic_emm",719,566618,24510
+"20","bay, florida","florida_emm",101,7862,12005
+"21","bay, florida","southeast_emm",779,60576,12005
+"22","beauregard, louisiana","mississippi delta_emm",1091,12405,22011
+"23","beauregard, louisiana","southern great plains_emm",66,754,22011
+"24","bedford, virginia","virginia_emm",774,30092,51019
+"25","bedford, virginia","virginia_emm",774,30092,51515
+"26","big horn, wyoming","great basin_emm",691,1013,56003
+"27","big horn, wyoming","rockies_emm",2419,3548,56003
+"28","bolivar, mississippi","mississippi delta_emm",195,2777,28011
+"29","bolivar, mississippi","southeast_emm",698,9950,28011
+"30","boone, kentucky","ohio valley_emm",90,15193,21015
+"31","boone, kentucky","tennessee valley_emm",166,28023,21015
+"32","bossier, louisiana","mississippi delta_emm",57,2941,22015
+"33","bossier, louisiana","southern great plains_emm",822,42274,22015
+"34","bowie, texas","southern great plains_emm",923,34156,48037
+"35","bowie, texas","texas_emm",14,513,48037
+"36","briscoe, texas","southern great plains_emm",567,435,48045
+"37","briscoe, texas","texas_emm",334,257,48045
+"38","buchanan, virginia","ohio valley_emm",368,7103,51027
+"39","buchanan, virginia","tennessee valley_emm",149,2865,51027
+"40","buncombe, north carolina","carolinas_emm",482,73799,37021
+"41","buncombe, north carolina","tennessee valley_emm",174,26613,37021
+"42","bureau, illinois","metropolitan chicago_emm",159,2576,17011
+"43","bureau, illinois","middle mississippi valley_emm",722,11686,17011
+"44","burke, north carolina","carolinas_emm",484,33733,37023
+"45","burke, north carolina","tennessee valley_emm",30,2071,37023
+"46","butte, south dakota","northern great plains_emm",2228,4093,46019
+"47","butte, south dakota","rockies_emm",37,67,46019
+"48","calcasieu, louisiana","mississippi delta_emm",995,67288,22019
+"49","calcasieu, louisiana","southern great plains_emm",99,6708,22019
+"50","campbell, kentucky","ohio valley_emm",50,11511,21037
+"51","campbell, kentucky","tennessee valley_emm",106,24558,21037
+"52","carroll, arkansas","mississippi delta_emm",481,8543,5015
+"53","carroll, arkansas","southern great plains_emm",161,2850,5015
+"54","carroll, maryland","mid-atlantic_emm",309,41096,24013
+"55","carroll, maryland","virginia_emm",140,18690,24013
+"56","carter, kentucky","ohio valley_emm",40,1023,21043
+"57","carter, kentucky","tennessee valley_emm",376,9737,21043
+"58","carter, montana","northern great plains_emm",1037,165,30011
+"59","carter, montana","northwest_emm",2314,367,30011
+"60","chariton, missouri","central great plains_emm",703,2973,29041
+"61","chariton, missouri","middle mississippi valley_emm",64,269,29041
+"62","chase, nebraska","northern great plains_emm",265,499,31029
+"63","chase, nebraska","rockies_emm",629,1182,31029
+"64","chaves, new mexico","southern great plains_emm",923,3621,35005
+"65","chaves, new mexico","southwest_emm",5113,20070,35005
+"66","cherry, nebraska","northern great plains_emm",3289,1397,31031
+"67","cherry, nebraska","rockies_emm",2667,1133,31031
+"68","claiborne, mississippi","mississippi delta_emm",22,155,28021
+"69","claiborne, mississippi","southeast_emm",472,3285,28021
+"70","coahoma, mississippi","mississippi delta_emm",26,424,28027
+"71","coahoma, mississippi","southeast_emm",507,8161,28027
+"72","coahoma, mississippi","tennessee valley_emm",54,876,28027
+"73","collingsworth, texas","southern great plains_emm",1802,1155,48087
+"74","collingsworth, texas","texas_emm",38,24,48087
+"75","copiah, mississippi","mississippi delta_emm",72,986,28029
+"76","copiah, mississippi","southeast_emm",710,9722,28029
+"77","crawford, arkansas","mississippi delta_emm",212,8150,5033
+"78","crawford, arkansas","southern great plains_emm",398,15297,5033
+"79","custer, montana","northern great plains_emm",864,1152,30017
+"80","custer, montana","northwest_emm",2910,3879,30017
+"81","de baca, new mexico","southern great plains_emm",1071,419,35011
+"82","de baca, new mexico","southwest_emm",1262,493,35011
+"83","dickenson, virginia","ohio valley_emm",111,2303,51051
+"84","dickenson, virginia","tennessee valley_emm",207,4287,51051
+"85","donley, texas","southern great plains_emm",542,441,48129
+"86","donley, texas","texas_emm",1323,1076,48129
+"87","eddy, new mexico","southern great plains_emm",2281,11091,35015
+"88","eddy, new mexico","southwest_emm",1917,9320,35015
+"89","fairfax, virginia","virginia_emm",407,399974,51059
+"90","fairfax, virginia","virginia_emm",407,399974,51600
+"91","floyd, kentucky","ohio valley_emm",221,9159,21071
+"92","floyd, kentucky","tennessee valley_emm",166,6901,21071
+"93","ford, illinois","metropolitan chicago_emm",53,623,17053
+"94","ford, illinois","middle mississippi valley_emm",433,5053,17053
+"95","franklin, arkansas","mississippi delta_emm",450,5150,5047
+"96","franklin, arkansas","southern great plains_emm",165,1887,5047
+"97","franklin, mississippi","mississippi delta_emm",8,46,28037
+"98","franklin, mississippi","southeast_emm",558,3165,28037
+"99","franklin, virginia","ohio valley_emm",700,26310,51067
+"100","franklin, virginia","ohio valley_emm",700,26310,51620
+"101","fremont, wyoming","great basin_emm",4833,8036,56013
+"102","fremont, wyoming","rockies_emm",4462,7419,56013
+"103","fresno, california","northern california_emm",5974,288715,6019
+"104","fresno, california","southern california_emm",14,676,6019
+"105","garza, texas","southern great plains_emm",1298,1211,48169
+"106","garza, texas","texas_emm",493,460,48169
+"107","graham, north carolina","carolinas_emm",31,389,37075
+"108","graham, north carolina","tennessee valley_emm",267,3312,37075
+"109","grant, louisiana","mississippi delta_emm",189,2092,22043
+"110","grant, louisiana","southern great plains_emm",489,5404,22043
+"111","greenup, kentucky","ohio valley_emm",32,1346,21089
+"112","greenup, kentucky","tennessee valley_emm",321,13325,21089
+"113","grenada, mississippi","southeast_emm",14,265,28043
+"114","grenada, mississippi","tennessee valley_emm",437,8514,28043
+"115","grimes, texas","mississippi delta_emm",283,3127,48185
+"116","grimes, texas","texas_emm",524,5775,48185
+"117","gulf, florida","florida_emm",288,2440,12045
+"118","gulf, florida","southeast_emm",341,2895,12045
+"119","hancock, illinois","metropolitan chicago_emm",2,22,17067
+"120","hancock, illinois","middle mississippi valley_emm",808,8018,17067
+"121","haywood, north carolina","carolinas_emm",140,6380,37087
+"122","haywood, north carolina","tennessee valley_emm",421,19183,37087
+"123","hempstead, arkansas","mississippi delta_emm",82,980,5057
+"124","hempstead, arkansas","southern great plains_emm",657,7859,5057
+"125","henderson, north carolina","carolinas_emm",275,33710,37089
+"126","henderson, north carolina","tennessee valley_emm",96,11738,37089
+"127","henry, illinois","metropolitan chicago_emm",367,9031,17073
+"128","henry, illinois","middle mississippi valley_emm",461,11342,17073
+"129","hinds, mississippi","mississippi delta_emm",872,89648,28049
+"130","hinds, mississippi","southeast_emm",8,829,28049
+"131","hinds, mississippi","tennessee valley_emm",8,874,28049
+"132","holmes, mississippi","mississippi delta_emm",188,1681,28051
+"133","holmes, mississippi","southeast_emm",587,5245,28051
+"134","hopkins, texas","southern great plains_emm",213,3566,48223
+"135","hopkins, texas","texas_emm",581,9742,48223
+"136","howard, arkansas","mississippi delta_emm",479,4328,5061
+"137","howard, arkansas","southern great plains_emm",115,1037,5061
+"138","howard, maryland","mid-atlantic_emm",240,98039,24027
+"139","howard, maryland","virginia_emm",16,6710,24027
+"140","howard, missouri","central great plains_emm",123,1037,29089
+"141","howard, missouri","middle mississippi valley_emm",349,2944,29089
+"142","iberia, louisiana","mississippi delta_emm",233,12370,22045
+"143","iberia, louisiana","southern great plains_emm",271,14408,22045
+"144","iroquois, illinois","metropolitan chicago_emm",29,307,17075
+"145","iroquois, illinois","middle mississippi valley_emm",1090,11649,17075
+"146","jackson, north carolina","carolinas_emm",190,6332,37099
+"147","jackson, north carolina","tennessee valley_emm",304,10114,37099
+"148","johnson, kentucky","ohio valley_emm",75,2669,21115
+"149","johnson, kentucky","tennessee valley_emm",187,6693,21115
+"150","kankakee, illinois","metropolitan chicago_emm",663,40403,17091
+"151","kankakee, illinois","middle mississippi valley_emm",18,1108,17091
+"152","kenton, kentucky","ohio valley_emm",88,33272,21117
+"153","kenton, kentucky","tennessee valley_emm",78,29496,21117
+"154","kern, california","northern california_emm",6090,190136,6029
+"155","kern, california","southern california_emm",2065,64463,6029
+"156","kings, california","northern california_emm",710,21098,6031
+"157","kings, california","southern california_emm",677,20135,6031
+"158","lasalle, illinois","metropolitan chicago_emm",644,25462,17099
+"159","lasalle, illinois","middle mississippi valley_emm",503,19885,17099
+"160","lawrence, kentucky","ohio valley_emm",343,5067,21127
+"161","lawrence, kentucky","tennessee valley_emm",79,1172,21127
+"162","lawrence, south dakota","northern great plains_emm",381,5005,46081
+"163","lawrence, south dakota","rockies_emm",421,5531,46081
+"164","lewis, kentucky","ohio valley_emm",25,275,21135
+"165","lewis, kentucky","tennessee valley_emm",477,5222,21135
+"166","lincoln, mississippi","mississippi delta_emm",245,5518,28085
+"167","lincoln, mississippi","southeast_emm",345,7778,28085
+"168","lincoln, nebraska","northern great plains_emm",1981,11616,31111
+"169","lincoln, nebraska","rockies_emm",581,3409,31111
+"170","livingston, illinois","metropolitan chicago_emm",715,9989,17105
+"171","livingston, illinois","middle mississippi valley_emm",331,4624,17105
+"172","logan, arkansas","mississippi delta_emm",644,7643,5083
+"173","logan, arkansas","southern great plains_emm",89,1061,5083
+"174","macon, north carolina","carolinas_emm",71,2054,37113
+"175","macon, north carolina","tennessee valley_emm",430,12537,37113
+"176","madison, arkansas","mississippi delta_emm",424,3108,5087
+"177","madison, arkansas","southern great plains_emm",419,3066,5087
+"178","madison, north carolina","carolinas_emm",82,1576,37115
+"179","madison, north carolina","tennessee valley_emm",360,6918,37115
+"180","madison, texas","mississippi delta_emm",296,2681,48313
+"181","madison, texas","texas_emm",166,1506,48313
+"182","marshall, illinois","metropolitan chicago_emm",95,1237,17123
+"183","marshall, illinois","middle mississippi valley_emm",302,3924,17123
+"184","martin, kentucky","ohio valley_emm",226,4396,21159
+"185","martin, kentucky","tennessee valley_emm",6,120,21159
+"186","meade, south dakota","northern great plains_emm",3364,9542,46093
+"187","meade, south dakota","rockies_emm",127,361,46093
+"188","mercer, illinois","metropolitan chicago_emm",218,2557,17131
+"189","mercer, illinois","middle mississippi valley_emm",356,4177,17131
+"190","miller, arkansas","mississippi delta_emm",250,6818,5091
+"191","miller, arkansas","southern great plains_emm",381,10401,5091
+"192","mitchell, north carolina","carolinas_emm",216,6529,37121
+"193","mitchell, north carolina","tennessee valley_emm",5,156,37121
+"194","modoc, california","northern california_emm",14,13,6049
+"195","modoc, california","northwest_emm",4187,4048,6049
+"196","montgomery, maryland","mid-atlantic_emm",292,207077,24031
+"197","montgomery, maryland","virginia_emm",211,150009,24031
+"198","montgomery, mississippi","southeast_emm",393,4287,28097
+"199","montgomery, mississippi","tennessee valley_emm",14,151,28097
+"200","montgomery, texas","mississippi delta_emm",398,59847,48339
+"201","montgomery, texas","texas_emm",684,102683,48339
+"202","nacogdoches, texas","southern great plains_emm",88,2150,48347
+"203","nacogdoches, texas","texas_emm",893,21711,48347
+"204","nassau, florida","florida_emm",288,12650,12089
+"205","nassau, florida","southeast_emm",368,16144,12089
+"206","natchitoches, louisiana","mississippi delta_emm",492,5886,22069
+"207","natchitoches, louisiana","southern great plains_emm",813,9728,22069
+"208","newton, texas","mississippi delta_emm",825,4694,48351
+"209","newton, texas","southern great plains_emm",13,75,48351
+"210","newton, texas","texas_emm",124,707,48351
+"211","park, wyoming","great basin_emm",6944,11831,56029
+"212","park, wyoming","rockies_emm",32,54,56029
+"213","pennington, south dakota","northern great plains_emm",1885,27917,46103
+"214","pennington, south dakota","rockies_emm",900,13334,46103
+"215","pike, kentucky","ohio valley_emm",597,20052,21195
+"216","pike, kentucky","tennessee valley_emm",199,6676,21195
+"217","polk, arkansas","mississippi delta_emm",688,6835,5113
+"218","polk, arkansas","southern great plains_emm",163,1615,5113
+"219","prairie, montana","northern great plains_emm",649,206,30079
+"220","prairie, montana","northwest_emm",1085,345,30079
+"221","quay, new mexico","southern great plains_emm",2611,3702,35037
+"222","quay, new mexico","southwest_emm",261,370,35037
+"223","randolph, missouri","central great plains_emm",52,990,29175
+"224","randolph, missouri","middle mississippi valley_emm",436,8352,29175
+"225","rankin, mississippi","mississippi delta_emm",34,2244,28121
+"226","rankin, mississippi","southeast_emm",60,3943,28121
+"227","rankin, mississippi","tennessee valley_emm",706,46649,28121
+"228","rapides, louisiana","mississippi delta_emm",36,1335,22079
+"229","rapides, louisiana","southern great plains_emm",1310,49066,22079
+"230","red river, louisiana","mississippi delta_emm",12,105,22081
+"231","red river, louisiana","southern great plains_emm",389,3367,22081
+"232","richmond, virginia","virginia_emm",282,90310,51159
+"233","richmond, virginia","virginia_emm",282,90310,51760
+"234","roanoke, virginia","ohio valley_emm",301,80320,51161
+"235","roanoke, virginia","ohio valley_emm",301,80320,51770
+"236","rusk, texas","southern great plains_emm",468,9237,48401
+"237","rusk, texas","texas_emm",468,9239,48401
+"238","sabine, texas","mississippi delta_emm",16,129,48403
+"239","sabine, texas","texas_emm",558,4609,48403
+"240","san miguel, new mexico","southern great plains_emm",1168,2954,35047
+"241","san miguel, new mexico","southwest_emm",3569,9024,35047
+"242","santa barbara, california","northern california_emm",1259,65732,6083
+"243","santa barbara, california","southern california_emm",1463,76362,6083
+"244","scott, arkansas","mississippi delta_emm",853,4092,5127
+"245","scott, arkansas","southern great plains_emm",58,276,5127
+"246","scotts bluff, nebraska","northern great plains_emm",571,11422,31157
+"247","scotts bluff, nebraska","rockies_emm",175,3506,31157
+"248","sebastian, arkansas","mississippi delta_emm",192,17430,5131
+"249","sebastian, arkansas","southern great plains_emm",355,32169,5131
+"250","sharkey, mississippi","mississippi delta_emm",1,6,28125
+"251","sharkey, mississippi","southeast_emm",441,1828,28125
+"252","sioux, nebraska","northern great plains_emm",79,22,31165
+"253","sioux, nebraska","rockies_emm",1995,555,31165
+"254","siskiyou, california","northern california_emm",60,184,6093
+"255","siskiyou, california","northwest_emm",6285,19318,6093
+"256","smith, texas","southern great plains_emm",133,10878,48423
+"257","smith, texas","texas_emm",835,68177,48423
+"258","st. landry, louisiana","mississippi delta_emm",623,21479,22097
+"259","st. landry, louisiana","southern great plains_emm",301,10378,22097
+"260","st. louis, missouri","middle mississippi valley_emm",588,546822,29189
+"261","st. louis, missouri","middle mississippi valley_emm",588,546822,29510
+"262","st. martin, louisiana","mississippi delta_emm",812,19065,22099
+"263","st. martin, louisiana","southern great plains_emm",6,151,22099
+"264","st. mary, louisiana","mississippi delta_emm",218,6619,22101
+"265","st. mary, louisiana","southern great plains_emm",457,13838,22101
+"266","sunflower, mississippi","mississippi delta_emm",138,1719,28133
+"267","sunflower, mississippi","southeast_emm",557,6951,28133
+"268","sunflower, mississippi","tennessee valley_emm",12,152,28133
+"269","sweetwater, wyoming","great basin_emm",10485,16447,56037
+"270","sweetwater, wyoming","rockies_emm",18,28,56037
+"271","tallahatchie, mississippi","mississippi delta_emm",30,227,28135
+"272","tallahatchie, mississippi","tennessee valley_emm",612,4629,28135
+"273","tazewell, virginia","ohio valley_emm",501,17566,51185
+"274","tazewell, virginia","tennessee valley_emm",25,883,51185
+"275","titus, texas","southern great plains_emm",363,9311,48449
+"276","titus, texas","texas_emm",59,1502,48449
+"277","trinity, texas","mississippi delta_emm",698,5913,48455
+"278","trinity, texas","texas_emm",27,229,48455
+"279","tulare, california","northern california_emm",552,14899,6107
+"280","tulare, california","southern california_emm",4277,115446,6107
+"281","uinta, wyoming","great basin_emm",947,3483,56041
+"282","uinta, wyoming","rockies_emm",1139,4185,56041
+"283","van zandt, texas","southern great plains_emm",81,1899,48467
+"284","van zandt, texas","texas_emm",779,18148,48467
+"285","vermilion, louisiana","mississippi delta_emm",1304,21862,22113
+"286","vermilion, louisiana","southern great plains_emm",2,27,22113
+"287","vernon, louisiana","mississippi delta_emm",436,6239,22115
+"288","vernon, louisiana","southern great plains_emm",903,12926,22115
+"289","walker, texas","mississippi delta_emm",762,19854,48471
+"290","walker, texas","texas_emm",43,1115,48471
+"291","waller, texas","mississippi delta_emm",464,12311,48473
+"292","waller, texas","texas_emm",65,1729,48473
+"293","warren, mississippi","mississippi delta_emm",474,16059,28149
+"294","warren, mississippi","southeast_emm",85,2882,28149
+"295","washakie, wyoming","great basin_emm",1104,1714,56043
+"296","washakie, wyoming","rockies_emm",1145,1778,56043
+"297","watauga, north carolina","carolinas_emm",297,20135,37189
+"298","watauga, north carolina","tennessee valley_emm",4,268,37189
+"299","webster, mississippi","southeast_emm",30,282,28155
+"300","webster, mississippi","tennessee valley_emm",397,3778,28155
+"301","westchester, new york","metropolitan new york_emm",354,258186,36119
+"302","westchester, new york","upstate new york_emm",122,89046,36119
+"303","wilkinson, mississippi","mississippi delta_emm",116,585,28157
+"304","wilkinson, mississippi","southeast_emm",569,2870,28157
+"305","wood, texas","southern great plains_emm",530,13078,48499
+"306","wood, texas","texas_emm",164,4040,48499
+"307","woodford, illinois","metropolitan chicago_emm",99,2557,17203
+"308","woodford, illinois","middle mississippi valley_emm",454,11719,17203
+"309","yazoo, mississippi","mississippi delta_emm",30,283,28163
+"310","yazoo, mississippi","southeast_emm",915,8577,28163
