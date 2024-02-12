@@ -58,7 +58,7 @@ Pseudo-code/outline
 ## NOTE: currently programmed to select the highest scores first within each bin
 sortBy <- "highest" # "lowest" (for LCOE); "highest" for random forest and other machine learning prediction
 date <- "012524"
-supplyScen <- "base"
+supplyScen <- "base" ## either "base" or "restricted" depending on the RIO scenario 
 
 ## main google shared folder path containing inputs and outputs
 google_fp <- "/Users/grace/Library/CloudStorage/GoogleDrive-gracecwu@ucsb.edu/My Drive/Research_Projects/WRI_biomass"
@@ -307,7 +307,7 @@ ifrm <- function(obj, env = globalenv()) {
 ## Main site selection loop
 ```{r}
 # SORT CPAS BY PREDICTION SCORE FOR EACH BIN FOR EACH STATE and for each unique scenario and year combination, select the CPAs
-for(scen in names(scenario.list)){
+for(scen in names(scenario.list.short)){
   scen_long <- scenario.list[scen] ## retrieve the long form of the scenario name
   
   for(tech in tech.list.select){
@@ -378,8 +378,7 @@ for(scen in names(scenario.list)){
         
         print(paste0(" ====> Working on ", tech,"; ZONE: ", zone,"; BIN: ", toString(bin)))
         
-        # ===> create a subset of SUPPLY (rio_bins_pred_tech) for each bin and zone combination, sorted [by highest to lowest (highest) or 
-        # lowest to highest (lowest) score], and with the cumulative sum
+        # ===> create a subset of SUPPLY (rio_bins_pred_tech) for each bin and zone combination, sorted [by highest to lowest (highest) and calculate cumulative sum
         rio_bins_pred_sub <- rio_bins_pred_tech %>%
           filter(bin_number == !!bin & gau == !!zone) %>% ## filter to bin and zone
           mutate(tech = !!techFN) %>% ## create a new column with the technology
