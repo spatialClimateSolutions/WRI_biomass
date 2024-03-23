@@ -16,31 +16,14 @@ library(janitor)
 
 ## Joining county names and fips, parsing state and county
 ```{r}
-zone_mapping <- read_xlsx(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/RIO_data/PreliminaryResults', 'zone mapping.xlsx'))
+zone_mapping <- read_xlsx(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/RIO_data/PreliminaryResults/zone mapping.xlsx'))
 county_zone <- zone_mapping[1:4]
 county_fips <- zone_mapping[8:9] %>% rename(county = name) %>% drop_na()
 
 # Here all of the counties have been joined with their appropriate fips
-zone_mapped <- left_join(county_zone, county_fips, by = 'county')
-
-# Parse county column to get state and county values
-parsed_state_county <- str_split(zone_mapped$county, ', ')
-
-# Initialize lists
-county_list <- c()
-state_list <- c()
-
-# Cycle through all output strings and add them to new objects
-for (i in 1:length(parsed_state_county)){
-  county_list <- c(county_list, parsed_state_county[[i]][1]) # extract and append state names
-  state_list <- c(state_list, parsed_state_county[[i]][2])
-}
-
-#Assign new parsed values to their respective columns
-zone_mapped <- zone_mapped %>%
+zone_mapped <- left_join(county_zone, county_fips, by = 'county') %>%
+  separate(county, c("county", "state"), sep = ", ") %>%
   clean_names() %>%
-  mutate(county = county_list,
-         state = state_list) %>%
   select(fips, county, state, zone, sqmi, households_2010_complete_count) %>%
   filter(!state %in% c('puerto rico', 'quebec (state)')) # Filter out regions with zero sqmi
 
@@ -82,17 +65,27 @@ zone_mapped <- zone_mapped %>%
   mutate(county_area_prop = county_zone_overlap_prop,
          state_area_prop = state_zone_overlap_prop)
 
+# Add Loving, Texas because it was missing
+zone_mapped <- rbind(zone_mapped, data.frame(fips = 48301, county = 'loving', state = 'texas', zone = 'texas_emm', sqmi = 669, 
+                                             households_2010_complete_count = 40, county_area_prop = 1, state_area_prop = 0.7742165)) %>%
+  filter(!fips %in% c(51620, 51770, 51515, 51760, 51600, 24510, 29510)) # Remove rows that are duplicates in the form of consolidated city-counties
+
+# https://en.wikipedia.org/wiki/County_(United_States)#Consolidated_city-counties
+
+# Write output of zone mapped if it gets updated
+#write.csv(zone_mapped, file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/Downscaling_biomass/intermediateFiles/zone_mapped.csv'), row.names = FALSE)
+
 # Checks that every unique county has a proportion that adds up to 1
 unique(zone_mapped %>% group_by(state, county) %>% summarize_at('county_area_prop', sum) %>% arrange(-county_area_prop) %>% ungroup() %>% select(county_area_prop))
 # If you want to check at the state level, compare values of state_areas, state_zone_overlap_sum, and zone_mapped
 ```
-
+## Below update the biomass feedstocks and categories based on the new v2 form of the csv
 
 ## Categorizing direct flows energy categories and converting units
 ```{r}
 # Read in demand and category data
-commodity_use <- read.csv(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/RIO_data/PreliminaryResults/commodity_use_y.csv'))
-biomass_feedstocks <- read.csv(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/Downscaling_biomass/intermediateFiles/biomassFeedstocksAndCategories_byScenario.csv'))
+commodity_use <- read.csv(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/RIO_data/FinalResults/commodity_potential_y.csv')) # New file here only has 2021, 2035, 2050 instead of every ten years like we had before
+biomass_feedstocks <- read.csv(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/Downscaling_biomass/intermediateFiles/biomassFeedstocksAndCategories_byScenario_v2.csv'))
 
 # Select only feedstocks we're interested in and add category variable
 commodity_use <- commodity_use %>%
@@ -103,21 +96,35 @@ commodity_use <- commodity_use %>%
 commodity_use <- commodity_use %>%
   mutate(
     energy_category = case_when( # Potential for change here based on updates made to broader categories
-      category == 'Woody' | category == 'Forestry waste and residues' ~ 'Forestry',
+      category == 'Woody purpose-grown energy crops' | category == 'Forestry waste and residues' ~ 'Forestry',
       commodity == 'landfill gas' ~ 'Landfill gas',
       TRUE ~ 'Other'),  # Default value if none of the conditions match
     tons = case_when(
-      unit == 'hectotonne' ~ value*100,
-      energy_category == 'Forestry' ~ value*3600/19,
-      energy_category == 'Landfill gas' ~ value*3600/26.1,
-      TRUE ~ value*3600/15
+      unit == 'hectotonne' ~ value*100, # First convert hectotonnes
+      energy_category == 'Forestry' ~ value*3600/19, # Then convert forestry category
+      energy_category == 'Landfill gas' ~ value*3600/26.1, # Then convert landfill gas commodity
+      TRUE ~ value*3600/15 # Convert the remaining feed stocks
     )
-  )
+  ) %>%
+  filter(type == 'actual') # Filter out all potential values, they're not necessary
 
 ```
 
 ## Final step to join zone demand and feedstocks
 ```{r}
-direct_flow_county <- merge(zone_mapped, commodity_use, by='zone')
-#write.csv(direct_flow_county, 'C:/Users/Hank1/Documents/BREN/WRI_biomass/WRI_biomass_scripts/commodity_flow_y_county_level.csv')
+# Average number of commodity rows per zone
+avg_commodities <- mean(table(commodity_use$zone))
+# Number of counties in the US
+total_counties <- dim(zone_mapped)[1]
+# Estimated number of rows in direct_flow_county, note that results will be higher because of counties appearing in multiple zones - expect ~15% increase
+projected_rows <- avg_commodities * total_counties * 1.15
+
+direct_flow_county <- merge(zone_mapped, commodity_use, by='zone') %>%
+  select(-c('households_2010_complete_count', 'unit', 'sqmi', 'value', 'type')) %>% # Remove unnecessary columns to reduce file size
+  filter(year %in% c(2035, 2050), # Remove 2021, we don't need it for results
+         !tons == 0) %>% # Remove rows with 0 tons of demand
+  rename(name = commodity)
+  
+# Write output to drive
+write.csv(direct_flow_county, 'G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/Downscaling_biomass/intermediateFiles/commodity_potential_y_county_level.csv', row.names = FALSE)
 ```

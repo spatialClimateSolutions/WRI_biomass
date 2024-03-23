@@ -1,0 +1,384 @@
+---
+title: "Supply-Side Data Processing"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(readxl)
+library(janitor)
+```
+
+## Data reading 
+```{r}
+# Set up Google Drive personal path -- CHANGES PER PERSON
+gdrive_path <- 'G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw'
+
+# Load in various datasets
+runs_key <- read.csv(file.path(gdrive_path, 'WRI_biomass/RIO_data/FinalResults/runs_key.csv'))
+biomass <- read.csv(file.path(gdrive_path, 'WRI_biomass/RIO_data/FinalResults/COMMODITY_POTENTIAL.csvd/biomass.csv'))
+fat_oil_grease <- read.csv(file.path(gdrive_path, 'WRI_biomass/RIO_data/FinalResults/COMMODITY_POTENTIAL.csvd/fats_oil_grease.csv'))
+potential_min_cropland_change <- read.csv(file.path(gdrive_path, 'WRI_biomass/RIO_data/FinalResults/COMMODITY_POTENTIAL.csvd/potential_min_cropland_change.csv'))
+biomass_feedstocks <- read.csv(file.path(gdrive_path, 'WRI_biomass/Downscaling_biomass/intermediateFiles/biomassFeedstocksAndCategories_byScenario_v2.csv'))
+
+bts_county_data <- read.csv(file.path(gdrive_path, 'WRI_biomass/Downscaling_biomass/inputs/BTS_county_supply.csv'))
+
+# bts_state_data <- read.csv(file.path('C:/Users/Hank1/Documents/BREN/Energysiting - Biomass/BTS_statedata/bts_state.csv'))
+
+```
+
+## Set Scenario
+```{r}
+# Scenario options
+# 'ira', 'central', 'slow.consumer.uptake', 'central.restrict', 'slow.consumer.uptake.restrict', 'central.COC', 'slow.consumer.uptake.COC'
+scenario <- 'ira'
+demand_scenario_names <- c('ira' = 'ira', 'central' = 'central', 'slow.consumer.uptake' = 'slow consumer uptake',
+                           'central.restrict' = 'central restrict', 'slow.consumer.uptake.restrict' = 'slow consumer uptake restrict', 
+                           'central.COC' = 'central COC', 'slow.consumer.uptake.COC' = 'slow consumer uptake COC')
+```
+
+## Parse Run Keys
+```{r}
+# Parse runs_key
+runs_key_select <- runs_key %>% 
+  ## Parse feedstock from data type
+  separate(sensitivity_key, c("dataType", "feedstock"), sep = "--") %>%
+  ## Select only commodity_potential
+  filter(dataType == "COMMODITY_POTENTIAL") %>%
+  ## Select only biomass feedstocks that are in the three supply curve sources 
+  filter(get(scenario) %in% c("ICCT x2 [d]", "BTS [d]", "min_cropland_change (llnl)", "3x expanded corn"))
+
+```
+
+## Join Supply Inputs
+```{r}
+combined_supply <- rbind(biomass, fat_oil_grease, potential_min_cropland_change) %>%
+  filter(name %in% unique(biomass_feedstocks$feedstock)) %>% 
+  left_join(runs_key_select %>% select(name = feedstock, scenario[1]), by = 'name') %>%
+  filter(sensitivity == get(scenario)) # Use of get() here allows filter to understand the string value as a column in the dataframe
+# Textiles and yard trimmings do not have a row in runs_key_select and thus is NA in the form of combined_supply above
+# These two feedstocks are accounted for in other waste categories
+
+# Old bts data processing before county data was integrated
+# bts_scenario <- combined_supply %>%
+#   filter(get(scenario) == 'BTS [d]' | get(scenario) == '3x expanded corn',
+#          year %in% c(2035, 2040, 2050),
+#          !grepl('existing', name)) %>% # Remove all existing feedstocks because there's not county level data
+#   mutate(year = case_when(year == 2035 ~ 2035,
+#                           year %in% c(2040, 2050) ~ 2050)) %>% # Filter for relevant years in the data
+#   select(-scenario) %>% # Remove duplicate scenario column and existing biomass that we don't have data for
+#   rename(state = gau) # Rename for join in next step
+  
+soy_oil_scenario <- combined_supply %>% 
+  filter(get(scenario) == 'ICCT x2 [d]',
+         year == 2032) %>%  # Select farthest out year to project for 2035 and 2050
+  select(-scenario) %>% # Remove duplicate
+  rename(state = gau) # Rename for join in next step
+
+llnl_scenario <- combined_supply %>% 
+  filter(gau != 'missing', get(scenario) == 'min_cropland_change (llnl)') %>% # Filter out rows missing locations or that have a different scenario
+  select(-scenario) %>% # Remove duplicate
+  separate(gau, c("county", "state"), sep = ", ") # Parse for later joining
+
+```
+
+## Process county level BTS data
+```{r}
+# Set null values to zero for numeric conversion in next step
+bts_county_data['Production'][bts_county_data['Production'] == 'null'] <- 0
+
+# Create variable that lists all BTS feedstocks in the current scenario
+bts_feedstocks <- unique(runs_key_select %>% filter(get(scenario) == 'BTS [d]') %>% select(feedstock))$feedstock
+
+# Pull county level data and format everything to match up with zone_mapped later 
+    bts_county_clean <- bts_county_data %>%
+      clean_names() %>% # Rename columns
+      mutate(resource = tolower(resource), # Format strings to match with existing data
+             state = tolower(state), # Format strings to match with existing data
+             county = str_remove(tolower(county), ' county'), # Remove trailing word county
+             county = str_remove(county, ' parish'), # Remove trailing word 'parish' for LA counties
+             county = str_remove(county, ' city'), # Remove trailing word 'city' for some counties
+             county = replace(county, county == 'doña ana', 'dona ana'), # Replace 'ñ' with 'n'
+             county = replace(county, county == 'la salle' & state == 'louisiana', 'lasalle'), # Replace in LA but not TX
+             county = replace(county, county == 'james' & state == 'virginia', 'james city'), # Add back 'city' where needed
+             county = replace(county, county == 'charles' & state == 'virginia', 'charles city'), # Add back 'city' where needed
+             production = as.numeric(production), # Convert to numeric
+             sensitivity = 'BTS [d]') %>%
+      filter(resource %in% c(bts_feedstocks, 'corn')) %>% # Filter for relevant feedstocks
+      select(resource, year, biomass_price, state, county, production, production_unit) %>% # Only relevant columns
+      rename(name = resource,
+             bin = biomass_price,
+             value = production) %>%
+      group_by(name, year, bin, state, county, production_unit) %>%
+      summarize_at('value', sum) %>% # Combine rows with split production values
+      ungroup() %>%
+      group_by(name, year, state, county) %>% # Set up to reverse cumulative sum across bins
+      arrange(bin) %>% # Set bin values in order
+      mutate(value = c(value[1], c(value - lag(value))[-1])) %>% # Method to undo cumulative sum
+      mutate(value = case_when(value <= 0 ~ 0, # Set all negatives to 0
+                               TRUE ~ value)) %>% # Leave values > 0 as they were
+      ungroup()  %>%
+      mutate(bin = case_when(name == 'corn' ~ 1, # Complete corn bin alignment here so that zone totals are accurate
+                             TRUE ~ bin)) %>%
+      group_by(name, year, bin, state, county, production_unit) %>%
+      summarize(value = sum(value)) # Combine all previous corn bin values into a single bin
+
+    bts_county_clean <- bts_county_clean %>%
+      rbind(bts_county_clean %>% filter(name == 'corn') %>% mutate(bin = 2), # Duplicate bin 1 data for other bins
+            bts_county_clean %>% filter(name == 'corn') %>% mutate(bin = 3))
+
+
+# Compare the state-level and county-level BTS totals to see how they relate
+# check1 <- bts_scenario %>% mutate(dt = as.integer(value*277.78*3600/15)) %>% group_by(state, name, bin, year) %>% summarize_at('dt', sum) # old state data from petajoules to dry tons
+# check2 <- bts_county_clean %>% group_by(state, name, bin, year) %>% summarize_at('value', sum) # new county data in dry tons
+# check3 <- bts_state_data %>% 
+#   select(State, Resource, Biomass.Price, Year, Production.Unit, Production) %>% 
+#   mutate(Biomass.Price = as.numeric(Biomass.Price),
+#          Production = as.numeric(Production)) %>%
+#   group_by(State, Resource, Biomass.Price, Year, Production.Unit) %>% summarize_at(1, sum)
+```
+
+
+
+## Import county overlap data and combine with previous results
+```{r}
+# Read in 
+zone_mapped <- read.csv(file.path(gdrive_path, 'WRI_biomass/Downscaling_biomass/intermediateFiles/zone_mapped.csv'))
+
+soy_oil_scenario <- left_join(soy_oil_scenario, zone_mapped, by = 'state')
+
+llnl_scenario <- left_join(llnl_scenario, zone_mapped, by = c('state', 'county'))
+
+bts_scenario <- left_join(bts_county_clean, zone_mapped, by = c('state', 'county'))
+
+```
+
+
+## Calculate total supply across zones by feedstock, bin, and year
+```{r}
+soy_oil_zone_sum <- soy_oil_scenario %>%
+  mutate(value = value * state_area_prop) %>% # Calculate state supply for its current zone
+  group_by(name, bin, year, zone, state) %>%
+  summarize_at(vars(value), mean) %>% # First needs to aggregate at the state level so that their values are not repeatedly summed
+  ungroup(state) %>% # Now ungroup state
+  summarize_at(vars(value), sum) %>% # Zone totals now are based on summed up state-wide values
+  rename(zone_total = value)
+
+# Here we need to be careful because the data is already aggregated at the county level
+# Need to scale the value for each county by its overlap percentage so that there's no double counting supply across differing zones
+# A good example to check for this is Kern, CA because it's in both north and south CA zones
+llnl_zone_sum <- llnl_scenario %>%
+  mutate(value = value * county_area_prop) %>%
+  group_by(name, bin, year, zone) %>%
+  summarize_at('value', sum) %>%
+  rename(zone_total = value)
+
+bts_zone_sum <- bts_scenario %>%
+  mutate(value = value * county_area_prop) %>%
+  group_by(name, bin, year, zone) %>%
+  summarize_at('value', sum) %>%
+  rename(zone_total = value)
+
+# Not necessary anymore because the bts county level data includes corn
+# corn_3x <- combined_supply %>%
+#   rename(state = gau) %>%
+#   filter(get(scenario) == '3x expanded corn',
+#          !state == 'export') %>% # Remove non state entries
+#   select(-scenario) %>% # Remove duplicate column
+#   left_join(zone_mapped, by = 'state') %>% # Combine to get zones and state overlaps
+#   group_by(zone, state, bin) %>%
+#   summarize_at(c('value', 'state_area_prop'), mean) %>% # Get state-zone overlap and supply value per state, bin, and zone
+#   mutate(state_bin_contribution = value * state_area_prop) %>% # Calculates the state-bin's contribution to the zone
+#   ungroup(state, bin) %>%
+#   summarize_at('state_bin_contribution', sum) %>% # Combines all values within a zone for the total zone supply
+#   rename(zone_total = state_bin_contribution) # Rename accordingly
+
+```
+
+
+## Combine zone totals with the existing df and calculate county proportion of zone total
+```{r}
+# Finalize fat, oil, and grease data
+soy_oil_supply_prop <- left_join(soy_oil_scenario, soy_oil_zone_sum, by = c('name', 'year', 'bin', 'zone')) %>%
+  mutate(state_zone_contribution = value/zone_total,
+         state_zone_contribution = replace(state_zone_contribution, state_zone_contribution == 'NaN', 0), # Set division by zero to 0
+         year = 2035)
+
+# Duplicate values from 2035 for 2050
+soy_oil_supply_prop <- rbind(soy_oil_supply_prop, soy_oil_supply_prop %>% mutate(year = 2050)) %>% # Duplicate data for 2050
+  group_by(name, state, year, zone) %>%
+  summarize_at('state_zone_contribution', mean) # Proportion is identical for each bin
+
+# Finalize LLNL data
+llnl_supply_prop <- left_join(llnl_scenario, llnl_zone_sum, by = c('name', 'year', 'bin', 'zone')) %>%
+  mutate(value = value * county_area_prop, # Scale county-wide supply by its overlap percentage first
+         county_zone_contribution = value/zone_total, # Calculate county contributions
+         year = replace(year, year == 2040, 2050)) %>% # Adjust beef, swine, dairy to be 2050
+  filter(year == 2050) %>%
+  select(name, year, bin, zone, state, county, county_zone_contribution)
+
+# Need to use 2040/2050 data as a proxy for 2035
+llnl_supply_prop <- rbind(llnl_supply_prop, llnl_supply_prop %>% mutate(year = 2035)) 
+
+# Finalize BTS data
+bts_supply_prop <- left_join(bts_scenario, bts_zone_sum, by = c('name', 'year', 'bin', 'zone')) %>%
+  mutate(value = value * county_area_prop, # Scale county-wide supply by its overlap percentage first
+         county_zone_contribution = value/zone_total,
+         year = replace(year, year == 2040, 2050)) %>% # Use 2040 data as a proxy for 2050
+  select(name, year, bin, zone, state, county, county_zone_contribution)
+```
+
+## Generate final results by linking supply side (above) with demand side
+
+```{r}
+state_level_supply <- soy_oil_supply_prop
+county_level_supply <- rbind(bts_supply_prop, llnl_supply_prop) %>%
+  mutate(bin = case_when(
+    name %in% c('switchgrass', 'miscanthus', 'wheat straw', 'corn stover', 'biomass sorghum', 
+                'sorghum stubble', 'barley straw', 'oats straw') ~ bin + 50,
+    name %in% c('willow', 'poplar', 'eucalyptus', 'pine') ~ bin + 40,
+    TRUE ~ bin)) # Align bin values for feedstocks that didn't match up
+
+scenario_demand <- read.csv('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/Downscaling_biomass/intermediateFiles/commodity_potential_y_county_level.csv') %>% 
+  filter(run.name == demand_scenario_names[scenario]) 
+
+state_demand_totals <- scenario_demand %>% 
+  filter(name %in% unique(state_level_supply$name), # Select state level feedstocks
+         !state == 'district of columbia') %>% # Remove DC because it has no supply
+  group_by(zone, state, name, year, bin)  %>%
+  summarize(tons = mean(tons)) # Keep correct state total while condensing counties
+
+state_level_results <- left_join(state_demand_totals, state_level_supply, # Join supply and demand
+                                 by = c('zone', 'state', 'name', 'year'))
+
+state_level_results <- state_level_results %>%
+  mutate(tons_of_production = tons * state_zone_contribution) # Calculate each state's contribution to the zone
+
+state_final_check <- state_level_results %>%
+  group_by(zone, name, year, bin) %>%
+  summarize(tons = mean(tons), tons_of_production = sum(tons_of_production)) # Creates columns for zone total and summed state contributions
+
+state_inequal <- state_final_check[round(state_final_check$tons, 3) != round(state_final_check$tons_of_production, 3), ] # Length of zero means everything adds up
+
+county_level_results <- left_join(scenario_demand %>% filter(name %in% unique(county_level_supply$name)), #Filter for county-specific feedstocks
+                                  county_level_supply, 
+                                  by = c('name', 'year', 'bin', 'zone', 'state', 'county'))
+
+county_level_results <- county_level_results %>% 
+  filter(!is.na(county_zone_contribution)) %>% # Drop all rows that don't contribute to production totals
+  mutate(tons_of_production = tons * county_zone_contribution) # Calculate county contributions to total zone tonnage
+
+county_final_check <- county_level_results %>%
+  group_by(zone, name, year, bin) %>%
+  summarize(tons = mean(tons), tons_of_production = sum(tons_of_production)) # Creates columns for zone total and summed county contributions -- should be equal
+
+county_inequal <- county_final_check[round(county_final_check$tons, 5) != round(county_final_check$tons_of_production, 5), ] # Checks equality of above columns -- should have zero rows
+
+zone_demand_totals <- scenario_demand %>%
+  filter(name %in% unique(county_level_supply$name)) %>%
+  group_by(zone, name, year, bin) %>%
+  summarize(tons = mean(tons))
+
+```
+## Convert final results into acres per county/state
+```{r}
+dry_tons_to_hectares <- read.csv(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/Downscaling_biomass/inputs/landUseFactors.csv'))
+dry_tons_to_acres <- dry_tons_to_hectares %>%
+  mutate(Technology = tolower(Technology)) %>% # match up feedstock names
+  slice(7:19) %>% # remove unnecessary rows
+  rename(name = Technology) %>%
+  select(name, landUseFactor) %>%
+  add_row(name = 'corn', landUseFactor = 9.3482) %>%
+  add_row(name = 'Soybean oil', landUseFactor = 10.06) %>%
+  mutate(landUseFactor = landUseFactor/2.47105) # Convert from hectares to acres
+
+# Soy: Assumes 206 bushels per ton soy oil output
+# https://ussec.org/resources/conversion-table/
+
+# Corn: Assumes corn has 16% moisture
+# https://grains.org/corn_report/corn-harvest-quality-report-2018-2019/4/
+
+state_level_results_acres <- state_level_results %>%
+  group_by(zone, state, name, year) %>%
+  summarize(tons_of_production = sum(tons_of_production)) %>% # Sum across bins
+  left_join(dry_tons_to_acres, by = 'name') %>%
+  mutate(acres = tons_of_production / landUseFactor)
+
+county_level_results_acres <- county_level_results %>%
+  group_by(zone, state, county, name, year) %>%
+  summarize(tons_of_production = sum(tons_of_production)) %>% # Sum across bins
+  left_join(dry_tons_to_acres, by = 'name') %>%
+  mutate(acres = tons_of_production / landUseFactor)
+
+
+```
+
+```{r}
+zone_demand_totals_nobin <- scenario_demand %>%
+  filter(name %in% unique(county_level_supply$name)) %>%
+  group_by(zone, name, year, bin) %>%
+  summarize(tons = mean(tons)) %>%
+  ungroup(bin) %>%
+  summarize(tons = sum(tons))
+
+final_county_totals_nobin <- final_county %>%
+  group_by(zone, name, year) %>%
+  summarize(tons = sum(tons_of_production))
+
+final_demand_difference <- zone_demand_totals_nobin %>%
+  left_join(final_county_totals_nobin, by = c('zone', 'name', 'year'))
+
+```
+
+
+
+```{r}
+## Check for the differences in bin ranges from supply and demand
+# for (feedstock in feedstocks){
+#   print(feedstock)
+#   print('Demand')
+#   print(table(scenario_demand %>% filter(name == feedstock) %>% select(bin)))
+#   print('Supply')
+#   print(table(county_level_supply %>% filter(name == feedstock) %>% select(bin)))
+#   print(' \ ')
+# }
+
+# Check the above results
+
+temp1 <- county_level_results %>%
+  filter(zone == 'middle mississippi valley_emm',
+         year == 2035,
+         name == 'hardwood, lowland logging residues') %>%
+  group_by(bin) %>%
+  summarize(county_zone_contribution = sum(county_zone_contribution))
+
+temp2 <- county_level_supply %>%
+  filter(zone == 'middle mississippi valley_emm',
+         year == 2035,
+         name == 'hardwood, lowland logging residues') %>%
+  group_by(bin) %>%
+  summarize(county_zone_contribution = sum(county_zone_contribution))
+
+# temp3 <- llnl_supply_prop %>%
+#   filter(zone == 'central great plains_emm',
+#          year == 2050,
+#          name == 'hardwood, lowland logging residues') %>%
+#   group_by(bin) %>%
+#   summarize(zone_total = mean(zone_total),
+#             zone_total_summed = sum(value))
+
+feedstocks <- unique(county_level_results$name)
+
+try1 <- bts_county_clean %>% 
+  filter(state == 'arizona',
+         year == 2035, 
+         name == 'barley straw') %>% 
+  group_by(name, year, state, county) %>% 
+  arrange(bin) %>%
+  mutate(value = c(value[1], c(value - lag(value))[-1])) %>%
+  mutate(value = case_when(value <= 0 ~ 0,
+                           TRUE ~ value))
+
+```
