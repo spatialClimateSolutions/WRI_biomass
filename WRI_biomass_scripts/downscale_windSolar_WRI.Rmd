@@ -14,7 +14,8 @@ library(dismo)
 library(sp)
 library(sf)
 require(rgdal)
-library(raster)
+#library(raster)
+library(terra)
 library(fasterize) ## convert sf polygons to raster
 library(ggplot2)
 library(dplyr)
@@ -51,48 +52,63 @@ Pseudo-code/outline
     b. Select the CPAs from the CPA shapefiles and save select CPAs shapefile. 
     
 ########################################
-# STEP 1. INPUT PARAMETERS AND SET FOLDER PATHS
+# STEP 1. SET PARAMETERS AND FOLDER PATHS
 
 ```{r}
 ## NOTE: currently programmed to select the highest scores first within each bin
 sortBy <- "highest" # "lowest" (for LCOE); "highest" for random forest and other machine learning prediction
-year.list <- c(2035, 2050)
+date <- "012524"
+supplyScen <- "base" ## either "base" or "restricted" depending on the RIO scenario 
 
-## main google shared folder path:
+## main google shared folder path containing inputs and outputs
 google_fp <- "/Users/grace/Library/CloudStorage/GoogleDrive-gracecwu@ucsb.edu/My Drive/Research_Projects/WRI_biomass"
 popNat_google_fp <- "/Users/grace/Library/CloudStorage/GoogleDrive-gracecwu@ucsb.edu/Shared drives/PoP_National/PoPNational_Data/0_Deliverables/multiTech_supplyCurve/Sept2023_updated"
+rioResultsFolder_fp <- file.path(google_fp, "RIO_data/PreliminaryResults2")
 
-rioResultsFolder_fp <- file.path(google_fp, "RIO_data/PreliminaryResults")
 #mergedCPAs_folderName <- "mergedCPAs_focalStats_v2"
 # zonalStats_folderName <- "zonalStatsCSVs_focalStats_v2"
 # leastCostPath_folderName <- "leastCostPath_focalStats_v2"
 # rf_field_PV <- "rf_pl_PV"
 # rf_field_wind <- "rf_pl_wind"
 
-## outputs folder:
-outputsFolder <- "../outputs/csvs_011024/"
-outputsFolder_shp <- "../outputs/shp_011024/" ## if we need to write this output locally for plotting in ArcGIS
-outputsFolder <- file.path(google_fp, "Downscaling_windSolar/downscaling_outputs/csvs_011024/")
-outputsFolder_shp <- file.path(google_fp, "Downscaling_windSolar/downscaling_outputs/shp_011024/")
+## outputs folders:
+outputsFolder <- file.path(google_fp, paste0("Downscaling_windSolar/downscaling_outputs/results_", date))
+outputsFolder_csv <- file.path(outputsFolder, paste0("csvs_", date))
+outputsFolder_shp <- file.path(outputsFolder, paste0("shp_", date))
+outputsFolder_diagnostics <- file.path(outputsFolder, paste0("diagnostics_", date))
+
+### write outputs folders if they don't already exist
+if (!file.exists(outputsFolder)){
+  # create the directory
+  print("Create main outputs folder")
+  dir.create(outputsFolder)
+}
+if (!file.exists(outputsFolder_csv)){
+  # create the directory
+  print("Create csv, shp, and diagnostics outputs folder")
+  dir.create(outputsFolder_csv)
+  dir.create(outputsFolder_shp)
+  dir.create(outputsFolder_diagnostics)
+}
 
 ## list of CPA attributes to keep in output shapefile
-keepFieldsList <- c("ID", "STATE_sub", "tot_txCost", "UNIQUEID", "CF_wind", "CF_fixed", "CF_track", "env_wind_i10", "env_PV_i10", "env_APV", "soc_PV", "soc_wind", "soc_APV", "spur_tx_cost", "rf_PV", "rf_wind", "rf_both", "pov", "unemp", "minrty", "nohsdp", "tech") # + SCENARIO!
-keepFieldsList <- c("ID", "STATE_sub", "tot_txCost", "UNIQUEID", "CF_wind", "CF_fixed", "CF_track", "env_wind_i10", "env_PV_i10", "env_APV", "soc_PV", "soc_wind", "spur_tx_cost", "rf_PV", "rf_wind", "rf_both", "tech") # + SCENARIO!
+keepFieldsList <- c("ID", "STATE_sub", "tot_txCost", "UNIQUEID", "CF_wind", "CF_fixed", "CF_track", "env_wind_i10", "env_PV_i10", "env_APV", "soc_PV", "soc_wind", "soc_APV", "spur_tx_cost", "rf_PV", "rf_wind", "pov", "unemp", "minrty", "nohsdp", "tech") # + SCENARIO!
+keepFieldsList <- c("ID", "STATE_sub", "tot_txCost", "UNIQUEID", "CF_wind", "CF_fixed", "CF_track", "env_wind_i10", "env_PV_i10", "env_APV", "soc_PV", "soc_wind", "spur_tx_cost", "rf_PV", "rf_wind", "tech") # + SCENARIO!
 
 ```
 
 ########################################
-# STEP 2: READ prediction surfaces, RIO bins csv, RIO results csv, merged CPA as shapefile and raster
+# STEP 2: READ INPUT FILES: prediction surfaces, RIO bins csv, RIO results csv, merged CPA as shapefile and raster
 
 ```{r}
 #######################
 # IMPORT PREDICTION SURFACES
 
-## ******* PLACEHOLDER for prediction surface file paths
-# pred_PV <- read.csv(file.path(google_fp, "Downscaling/downscaling_inputs/Wind_solar_predictionSurfaces/XXXX.csv"))
+## Wind and solar prediction surface file paths
+pred_PV <- rast(file.path(google_fp, "Downscaling_windSolar/downscaling_inputs/Wind_solar_predictionSurfaces/pred_randomForest_noRegion_solar_2017_ptLoc.tif"))
 
-# pred_wind <- read.csv(file.path(google_fp, "Downscaling/downscaling_inputs/Wind_solar_predictionSurfaces/XXXX.csv")) 
-
+#pred_wind <- rast(file.path(google_fp, "Downscaling_windSolar/downscaling_inputs/Wind_solar_predictionSurfaces/pred_randomForest_wind.csv")) 
+pred_wind <- rast("/Users/grace/Documents/PoP_national/Downscaling/spatialInputs/randomForest_noregion_wPlannedTx_wind_2017.tif")
 
 #######################
 # IMPORT RIO RESULTS
@@ -102,7 +118,7 @@ head(rio_cap)
 rio_tech_list <- unique(rio_cap$tech)
 
 ## Import RIO resource bins 
-rio_bins <- read.csv(paste0("../../../RIOresults/", rioFolderName, "/binned_resource_df.csv"))
+rio_bins <- read.csv(file.path(rioResultsFolder_fp, "binned_resource_df", paste0("binned_resource_df_", supplyScen,".csv")))
 colnames(rio_bins)
 
 #######################
@@ -115,6 +131,7 @@ CPA_1 <- st_read(file.path(popNat_google_fp, "CPA_GISfiles/merged_CPA_focalStats
 CPA_2 <- st_read(file.path(popNat_google_fp,"CPA_GISfiles/merged_CPA_focalStats_800001_1600000.shp"), stringsAsFactors = FALSE)
 CPA_3 <- st_read(file.path(popNat_google_fp, "CPA_GISfiles/merged_CPA_focalStats_1600001_plus.shp"), stringsAsFactors = FALSE)
 
+#######################
 ## import spur lines
 #spurs_1 <- st_read(paste0("../../../SupplyCurveAnalysis/Tx/", leastCostPath_folderName, "/LCP_costing_mergedSubID_1_1200000.shp"), stringsAsFactors = FALSE)
 #spurs_2 <- st_read(paste0("../../../SupplyCurveAnalysis/Tx/", leastCostPath_folderName, "/LCP_costing_mergedSubID_1200001_plus.shp"), stringsAsFactors = FALSE)
@@ -130,25 +147,24 @@ CPA_3 <- st_read(file.path(popNat_google_fp, "CPA_GISfiles/merged_CPA_focalStats
 #SVI_CPA_df <- read.csv("../../../SupplyCurveAnalysis/attributeData/", zonalStats_folderName, "/SVI2020.csv")
 
 #######################
-# IMPORT CPAS AS RASTER
-CPAs_ras <- raster(file.path(popNat_google_fp, "CPA_GISfiles/merged_CPA_focalStats_v2_ras.tif"))
+# IMPORT CPAS AS RASTER FOR ZONAL STATS
+CPAs_ras <- rast(file.path(popNat_google_fp, "CPA_GISfiles/merged_CPA_focalStats_v2_ras.tif"))
 
 ```
 
 ########################################
-# STEP 3a: GET AVERAGE PREDICTION SCORE PER CPA (ZONAL STATS)
+# STEP 3A: GET AVERAGE PREDICTION SCORE PER CPA (ZONAL STATS)
 
 ```{r}
 ######################################
-## Zonal stats for prediction surfaces
-
+## Function to fix extent. works with spatRaster (terra)
 fixExtent <- function(template, in_ras){
-  e <- extent(template)
+  e <- ext(template)
   ## https://gis.stackexchange.com/questions/158159/snapping-raster-grids-in-r
-  in_ras = resample(in_ras, template, "bilinear")
+  in_ras = terra::resample(in_ras, template, "bilinear")
   in_ras <- crop(in_ras, e)
   
-  if(sum(as.matrix(extent(in_ras))!=as.matrix(e)) == 0){ # edited
+  if(sum(as.matrix(ext(in_ras))!=as.matrix(e)) == 0){ # edited
     in_ras_mask <- mask(in_ras, template) # You can't mask with extent, only with a Raster layer, RStack or RBrick
   }else{
     in_ras <- extend(in_ras, template)
@@ -157,77 +173,88 @@ fixExtent <- function(template, in_ras){
   return(in_ras_mask)
 }
 
-## **** PLACEHOLDER: need to reproject predPV and predWind to same projection as CPAs_ras
+######################################
+## Reproject predPV and predWind to same projection as CPAs_ras
+pred_PV <- project(pred_PV, CPAs_ras, method = "bilinear")
+pred_wind <- project(pred_wind, CPAs_ras, method = "bilinear")
 
-## Get df of prediction scores by CPA - PV
+######################################
+## Get df of prediction scores by CPA - PV using ZONAL STATS
 predPV.ras.fixed <- fixExtent(CPAs_ras, pred_PV)
 predPV_CPA_df <- as.data.frame(zonal(x = predPV.ras.fixed, z = CPAs_ras, fun ='mean', na.rm = TRUE))
+colnames(predPV_CPA_df) <- c("UNIQUEID", "rf_PV") ### rename columns
+max(predPV_CPA_df$rf_PV, na.rm = TRUE)
 
-## Get df of prediction scores by CPA - PV
-predWind.ras.fixed <- fixExtent(CPAs_ras, pred_PV)
+######################################
+## Get df of prediction scores by CPA - wind using ZONAL STATS
+predWind.ras.fixed <- fixExtent(CPAs_ras, pred_wind)
 predWind_CPA_df <- as.data.frame(zonal(x = predWind.ras.fixed, z = CPAs_ras, fun ='mean', na.rm = TRUE))
-
-## **** PLACEHOLDER: make sure there's a UNIQUEID field in the resulting df, if not, rename the zone column
+colnames(predWind_CPA_df) <- c("UNIQUEID", "rf_wind") ## rename columns
+max(predWind_CPA_df$rf_wind, na.rm = TRUE)
 
 ```
 
 
 ########################################
-# STEP 3b: join prediction scores to RIO binned df
+# STEP 3B: JOIN PREDICTION SCORES TO RIO BIN DF (SUPPLY CURVE)
 
 ```{r}
 ######################################
-## Join prediction scores df to RIO bins df
-
-## filter rio bin rows to onshore wind and solar using uniqueID
+## Filter rio bin rows to onshore wind and solar using UNIQUEID
 rio_bins <- rio_bins %>% 
   drop_na(UNIQUEID)
 nrow(rio_bins)
 
-## join the prediction values to RIO bins 
+######################################
+## Join the prediction scores to RIO bins df using UNIQUEID
 rio_bins <- rio_bins %>% 
   select(-c(rf_PV, rf_wind)) %>% ## drop old prediction values
-  rename(STATE_sub = STATE) %>%
-  left_join(pred_PV, by = c("UNIQUEID"= "UNIQUEID")) %>%
-  left_join(pred_wind, by = c("UNIQUEID"= "UNIQUEID"))
+  left_join(predPV_CPA_df, by = c("UNIQUEID"= "UNIQUEID")) %>%
+  left_join(predWind_CPA_df, by = c("UNIQUEID"= "UNIQUEID"))
 
-## drop CPA rows that have no prediction values
+######################################
+## Check: drop CPA rows that have no prediction values
 rio_bins_pred <- rio_bins %>% 
   drop_na(rf_PV)
-
 print(paste("Number of CPAs missing prediction values:", toString(nrow(rio_bins) - nrow(rio_bins_pred))))
 
-## delete objects that are no longer needed and take up a lot of memory
+######################################
+## Clean up: delete objects that are no longer needed and take up a lot of memory
 rm(rio_bins, pred_PV, pred_wind)
+
+colnames(rio_bins_pred)
 ```
 
 
 ########################################
-# STEP 4: Prep the technology, zone, scenario, bin lists for looping and subset the RIO capacity results df
+# STEP 4: PREP LISTS FOR LOOP AND SUBSETTING THE RIO CAPACITY RESULTS DF
 ```{r}
+######################################
 ## get list of zones, bin numbers, and scenarios
 zone.list <- unique(rio_bins_pred$gau)
 bin.list <- unique(rio_bins_pred$bin_number)
 scenario.list <- unique(rio_cap$run.name)
+techComboGroup.list <- unique(rio_bins_pred$tech_combo_group)
 tech.list <- unique(rio_cap$tech..outputs_group_aggregate)
-colnames(rio_cap)
+unique(rio_cap$tech..outputs_group_detailed)
+unique(rio_cap$tech..outputs_group_aggregate)
 year.list <- unique(rio_cap$year)
-#tech.list.select <- c("fixed pv+agriculture", "fixed pv+wind+agriculture","wind+tracking pv","onshore wind", "fixed pv", "tracking pv")
-#tech.list.select <- c("fixed pv+agriculture", "wind+tracking pv","onshore wind", "fixed pv", "tracking pv")
-#tech.list.select <- c("wind+tracking pv","onshore wind", "fixed pv", "tracking pv")
+tech.list.select <- c("onshore wind", "solar")
 
-# postprocess RIO capacity results to filter by technologies we're downscaling and isolate the bins from the technology (which are in the same column)
+######################################
+# post process RIO capacity results to filter by technologies we're downscaling and isolate the bins from the technology (which are in the same column)
 ## filter RIO results to technology.list.select and create column with just the bin numbers
 rio_cap_sub <- rio_cap %>%
-  ## select just onshore wind (need to replace the subscript with space)
-  filter(tech..outputs_group_detailed %in% tech.list.select) %>%
+  ## select just onshore wind and solar (which contains rooftop, but rooftop does not have bins)
+  filter(tech..outputs_group_aggregate %in% tech.list.select) %>%
   ## create new column with just bins numbers; use the "look around" regex: https://cran.r-project.org/web/packages/stringr/vignettes/regular-expressions.html
   mutate(bin_number = as.numeric(str_extract(tech, "(?<=|\\s)\\d+"))) %>%
-  filter(!grepl('existing', tech)) %>%
-  select(c(run.name, year, tech..outputs_group_detailed, zone, bin_number, value)) %>%
-  rename(technology = tech..outputs_group_detailed)
-  # filter(run.name=="reference")
+  filter(!grepl('existing', tech)) %>% ## remove rows for existing resources
+  select(c(run.name, year, tech..outputs_group_aggregate, zone, bin_number, value)) %>% ## units for values are in GW
+  rename(technology = tech..outputs_group_aggregate) %>%
+  filter(bin_number %in% bin.list) ## select only rows that have bins (utility-scale PV)
 
+######################################
 ## QA/QC: 
 ## check that there are no duplicates 
 rio_sub_final <- rio_cap_sub %>%
@@ -241,172 +268,122 @@ rio_cap_sub_noVal <- rio_cap_sub %>%
   select(-value)
 #test <- rio_cap_sub_noVal[duplicated(rio_cap_sub_noVal),]
 
-## check filter
+######################################
+## check results using a filter for one combination
 filteredRows = rio_cap_sub %>%
-  filter(run.name == "100p", year == "2027", technology == "onshore wind", zone == "central great plains_emm", bin_number == "1")
+  filter(run.name == "ira", year == "2035", technology == "onshore wind", zone == "central great plains_emm", bin_number == "1")
 ```
 
+########################################
+# STEP 5: SELECT CPAS FOR EACH SCENARIO AND YEAR COMBO
 
-## rules for technology combinations and corresopnding selected technology
-
-POP NATIONAL SETUP: 
-tech_combo_group or the CPA flags (bins)     |   technology (results)
-"solar+agriculture"  --->  "fixed pv+agriculture"
-"solar+wind+agriculture" --->  "fixed pv+wind+agriculture"
-
-Run in order:
-1. "wind available" & CPA_solar == 1 ---> "wind+tracking pv" 
-2. after removing all of 1 above: "wind available" ---> "onshore wind"
-3. after removing all of 1 and 2 above: CPA_solar == 1 ---> "fixed pv"
-4. after removing 1, 2, and 3 above: CPA_solar == 1 ---> "tracking pv"
-
+Rules for technology combinations and corresopnding selected technology
 For each technology in the results (rio_cap_sub), subset the supply curve (rio_bins_pred), removing previously selected CPAs as necessary
 
 WRI SETUP: 
 - Treat all wind+tracking pv as onshore wind
 - Treat all fixed pv as tracking pv
 - Remove all agrivoltaic areas
+- downscale wind first and solar second
 
-########################################
-# STEP 5: SELECT CPAS FOR EACH SCENARIO AND YEAR COMBO
-
-hold over from last script: CREATE NEW FIELDS FOR EACH SCENARIO AND YEAR COMBINATION IN CPA FC WITH VALUE = 1 IF CPA IS SELECTED
+## Set inputs
 ```{r}
-## FOR TESTING THE BELOW CODE
-#zone <- "montana"#"new mexico"
-#bin <- 1
-#scenario <- "high elec level 1"
+## set year
+yr = 2050
 
-year.list = c(2050)
-yr = 2035
-
-## subset scenarios
+## set scenarios and their abbreviated names
 scenario.list <- unique(rio_cap$run.name)
-scenario.list <- c("30p", "100p")
+names(scenario.list) <- c("ira", "central", "slow", "centralRes", "slowRes", "centralCOC", "slowCOC")
 
-## create empty results list for CPAs
-results.scen.list <- list()
+## function that removes object if it exists
+ifrm <- function(obj, env = globalenv()) {
+    obj <- deparse(substitute(obj))
+    if(exists(obj, envir = env)) {
+        rm(list = obj, envir = env)
+    }
+}
+```
 
+## Main site selection loop
+```{r}
 # SORT CPAS BY PREDICTION SCORE FOR EACH BIN FOR EACH STATE and for each unique scenario and year combination, select the CPAs
-for(scen in scenario.list){
-  ## Set output csv filename for each technology
-  resultsCSV_scen <- paste0(outputsFolder, scen, "_", toString(yr), "_allTech", ".csv")
-
+for(scen in names(scenario.list.short)){
+  scen_long <- scenario.list[scen] ## retrieve the long form of the scenario name
+  
   for(tech in tech.list.select){
     tic(paste(scen, tech))
     print(paste("===== > WORKING ON", tech))
-    ## ===== filter the RESULTS to the technology and scenario
-    rio_cap_sub_loop <- rio_cap_sub %>%
-      filter(run.name == !!scen, technology == !!tech, year == !!yr)
     
-    ## ====== filter the BINS/SUPPLY to the technology and set the rf score fieldname and solar and wind capacity fieldnames
-    if(tech == "fixed pv+agriculture"){
-      techFN <- "APV"
-      rio_bins_pred_tech <-filter(rio_bins_pred, tech_combo_group == "solar+agriculture")
-      scoreField <- "rf_PV"
-      solarCapacityField <- "MW_APV_tr"
-      windCapacityField <- NA
-      capacityField <- solarCapacityField
-    }
-    # if(tech == "fixed pv+wind+agriculture"){
-    #   techFN <- "trilocation"
-    #   rio_bins_pred_tech <-filter(rio_bins_pred, tech_combo_group == "solar+wind+agriculture")
-    #   scoreField <- "rf_both"
-    #   solarCapacityField <- "MW_APV_fi"
-    #   windCapacityField <- "MW_CO_wi_7"
-    #   capacityField <- "MW_tri_tot"
-    # }
-    if(tech =="wind+tracking pv"){
-      techFN <- "colocation"
-      rio_bins_pred_tech <-filter(rio_bins_pred, CPA_wind == 1 & CPA_solar == 1)
-      scoreField <- "rf_both"
-      solarCapacityField <- "MW_CO_tr_1"
-      windCapacityField <- "MW_CO_wi_1"
-      capacityField <- "MW_CO_tot"
-    }
+    ######################################
+    ## ===== filter the RESULTS (RIO_CAP_SUB) to the technology and scenario
+    rio_cap_sub_loop <- rio_cap_sub %>%
+      filter(run.name == !!scen_long, technology == !!tech, year == !!yr)
+    
+    ######################################
+    ## ====== filter the BINS/SUPPLY (rio_bins_pred) to the technology and set the rf score fieldname and solar and wind capacity fieldnames
     if(tech == "onshore wind"){
-      techFN <- "onshoreWind"
-      rio_bins_pred_tech <- filter(rio_bins_pred, CPA_wind == 1)
-      ## REMOVE CPAs selected earlier (colocated)
-      colocation_df <- read_csv(paste0(outputsFolder, scen, "_", toString(yr), "_", "colocation", ".csv"), show_col_types = FALSE)
-      rio_bins_pred_tech <- rio_bins_pred_tech[!(rio_bins_pred_tech$UNIQUEID %in% colocation_df$UNIQUEID),]
-      scoreField <- "rf_wind"
+      techFN <- "onshoreWind" ## tech name to use in filename
+      rio_bins_pred_tech <- filter(rio_bins_pred, tech_combo_group == "wind available")
+      
+      # set prediction score and capacity fields
+      scoreField <- "rf_wind" 
       solarCapacityField <- NA
       windCapacityField <- "MW_WO_wi"
       capacityField <- windCapacityField
     }
-    if(tech == "fixed pv"){
-      techFN <- "fixedPV"
+    if(tech == "solar"){
+      techFN <- "solarPV" ## tech name to use in filename
       rio_bins_pred_tech <-filter(rio_bins_pred, CPA_solar == 1)
-      ## REMOVE CPAs selected earlier (colocated, wind only)
-      #colocation_df <- read_csv(paste0(outputsFolder, scen, "_", toString(yr), "_", "colocation", ".csv"), show_col_types = FALSE)
-      #windOnly_df <- read_csv(paste0(outputsFolder, scen, "_", toString(yr), "_", "onshoreWind", ".csv"), show_col_types = FALSE)
-      ## combine CPAs selected earlier
-      #combList <- c(colocation_df$UNIQUEID, windOnly_df$UNIQUEID)
-      #rio_bins_pred_tech <- rio_bins_pred_tech[!(rio_bins_pred_tech$UNIQUEID %in% combList),]
-      rio_bins_pred_tech <- filter(rio_bins_pred, tech_combo_group == "solar alone")
+      
+      ## REMOVE CPAs from rio_bins_pred_tech that were selected earlier (onshore wind)
+      windOnly_df <- read_csv(file.path(outputsFolder_csv, paste0(scen, "_", toString(yr), "_", "onshoreWind", ".csv")), show_col_types = FALSE)
+      rio_bins_pred_tech <- rio_bins_pred_tech[!(rio_bins_pred_tech$UNIQUEID %in% windOnly_df$UNIQUEID),]
+      
+      # set prediction score and capacity fields
       scoreField <- "rf_PV"
       solarCapacityField <- "MW_SO_fi"
       windCapacityField <- NA
       capacityField <- solarCapacityField
     }
-    if(tech == "tracking pv"){
-      techFN <- "trackingPV"
-      rio_bins_pred_tech <-filter(rio_bins_pred, CPA_solar == 1)
-      ## REMOVE CPAs selected earlier (colocated, wind only, fixed PV)
-      #colocation_df <- read_csv(paste0(outputsFolder, scen, "_", toString(yr), "_", "colocation", ".csv"), show_col_types = FALSE)
-      #windOnly_df <- read_csv(paste0(outputsFolder, scen, "_", toString(yr), "_", "onshoreWind", ".csv"), show_col_types = FALSE)
-      fixedPV_df <- read_csv(paste0(outputsFolder, scen, "_", toString(yr), "_", "fixedPV", ".csv"), show_col_types = FALSE)
-      ## combine CPAs selected earlier
-      #combList <- c(colocation_df$UNIQUEID, windOnly_df$UNIQUEID, fixedPV_df$UNIQUEID)
-      rio_bins_pred_tech <- rio_bins_pred_tech[!(rio_bins_pred_tech$UNIQUEID %in% fixedPV_df$UNIQUEID),]
-      scoreField <- "rf_PV"
-      solarCapacityField <- "MW_SO_tr"
-      windCapacityField <- NA
-      capacityField <- solarCapacityField
-    }
     
+    ######################################
     ### ==== SET OUTPUT DF LISTS AND CSV FILEPATHS
     ## create empty results list for CPAs
-    results.tech.list <- list()
+    selectedRows.allZoneBin.list <- list()
     ## Set output csv filename for each technology
-    resultsCSV_tech <- paste0(outputsFolder, scen, "_", toString(yr), "_", techFN, ".csv")
-    ## Set output CPA  filename for each technology
-    resultsSHP_CPA_tech <- paste0(outputsFolder_shp, scen, "_", toString(yr), "_", techFN, "_CPA.shp")
+    resultsCSV_tech <- file.path(outputsFolder_csv, paste0(scen, "_", toString(yr), "_", techFN, ".csv"))
+    ## Set output CPA (shp)  filename for each technology
+    resultsSHP_CPA_tech <- file.path(outputsFolder_shp, paste0(scen, "_", toString(yr), "_", techFN, "_CPA.shp"))
     ## Set output spur  filename for each technology
-    resultsSHP_spur_tech <- paste0(outputsFolder_shp, scen, "_", toString(yr), "_", techFN, "_spur.shp")
-    ## create empty df for residuals
+    #resultsSHP_spur_tech <- paste0(outputsFolder_shp, scen, "_", toString(yr), "_", techFN, "_spur.shp")
+    
+    ## create empty df to hold residuals
     residuals.df <- setNames(data.frame(matrix(ncol = 5, nrow = 0)), c("scenario", "zone", "bin", "residual_MW", "residual_percentage"))
-    residuals_CSV <- paste0(outputsFolder, "diagnostics/", "residuals_", scen, "_", toString(yr), "_", techFN, ".csv")
+    residuals_CSV <- file.path(outputsFolder_diagnostics, paste0("residuals_", scen, "_", toString(yr), "_", techFN, ".csv"))
+    
     ## create empty df for bins-zones with insufficient CPAs
     insufficientCPAs.df <- setNames(data.frame(matrix(ncol = 4, nrow = 0)), c("scenario", "zone", "bin", "neededMW"))
-    insufficientCPAs_CSV <- paste0(outputsFolder, "diagnostics/", "insufficientCPAs_", scen, "_", toString(yr), "_", techFN, ".csv")
+    insufficientCPAs_CSV <- file.path(outputsFolder_diagnostics, paste0("insufficientCPAs_", scen, "_", toString(yr), "_", techFN, ".csv"))
 
     ## get list of zones
     zone.list <- unique(rio_cap_sub_loop$zone)
     ## get list of bins
     bin.list <- unique(rio_cap_sub_loop$bin_number)
 
+    ######################################
+    ######################################
+    # LOOP THROUGH EACH ZONE-BIN COMBINATION TO SELECT THE ROWS THAT MEET THE INSTALLED CAPACITY DEMAND IN MW
     for(zone in zone.list){
       for(bin in bin.list){
         
-        print(paste(" ====> Working on ", tech ,"for zone", zone, "and bin", toString(bin), sep=" "))
+        print(paste0(" ====> Working on ", tech,"; ZONE: ", zone,"; BIN: ", toString(bin)))
         
-        # create a subset of CPA_join for each bin and zone combination, sorted [by highest to lowest (highest) or 
-        # lowest to highest (lowest) score], and with the cumulative sum
+        # ===> create a subset of SUPPLY (rio_bins_pred_tech) for each bin and zone combination, sorted [by highest to lowest (highest) and calculate cumulative sum
         rio_bins_pred_sub <- rio_bins_pred_tech %>%
-          filter(bin_number == !!bin & gau == !!zone) %>%
-          mutate(tech = !!techFN) %>%
-          arrange(-!!as.name(scoreField)) %>%
-          mutate(cumsum = cumsum(UQ(rlang::sym(capacityField)))) # https://stackoverflow.com/questions/26003574/use-dynamic-name-for-new-column-variable-in-dplyr
-        
-        ## Calculate the cumulative sum of capacity for each technology
-        #if(!is.na(solarCapacityField)){
-        #  rio_bins_pred_sub <- rio_bins_pred_sub %>%
-        #    mutate(cumsum_solar = cumsum(solarCapacityField))}
-        #if(!is.na(solarCapacityField)){
-        #  rio_bins_pred_sub <- rio_bins_pred_sub %>%
-        #    mutate(cumsum_wind = cumsum(windCapacityField))}
+          filter(bin_number == !!bin & gau == !!zone) %>% ## filter to bin and zone
+          mutate(tech = !!techFN) %>% ## create a new column with the technology
+          arrange(-!!as.name(scoreField)) %>% ## sort by prediction score
+          mutate(cumsum = cumsum(UQ(rlang::sym(capacityField)))) ## calculate cumulative sum in a new column (https://stackoverflow.com/questions/26003574/use-dynamic-name-for-new-column-variable-in-dplyr)
         
         ## ====> get DEMAND (RESULTS) for the zone and bin
         demand <- rio_cap_sub_loop %>%
@@ -414,23 +391,25 @@ for(scen in scenario.list){
         
         ## if filtering worked correctly and there is one value for each zone bin combination:
         if(dim(demand)[1] == 1){
-          print(paste("Working on zone:", zone, "bin:", toString(bin), "scenario:", scen, "year:", toString(yr), sep=" "))
+          print(paste("     Selecting sites for ZONE:", zone, "; BIN:", toString(bin), "; SCENARIO:", scen, "; YEAR:", toString(yr), sep=" "))
           
-          MW <- demand$value*1000 ## in MW of capacity
+          ## get the demand for that zone-bin combo as a scalar object in units of MW
+          MW <- demand$value*1000 ## converting from GW to MW of capacity
           
-          ## If there are no CPAs available/left in this bin-zone combination, then skip, but save this information in a df 
+          ## If there are NO CPAs available/left in this bin-zone combination, then skip site selection, but save this information in the insufficientCPAs df 
           if(nrow(rio_bins_pred_sub) == 0){
-              print(paste("***** ALERT! There are no CPAs left in Zone", zone, "and bin", toString(bin) ,sep=" "))
+              print(paste("          ***** ALERT! There are no CPAs left in Zone", zone, "and Bin", toString(bin), "and demand =", str(MW),sep=" "))
               insufficientCPAs.newRow <- data.frame(scenario = scen, zone = zone, bin = bin, neededMW = MW)
               insufficientCPAs.df <- rbind(insufficientCPAs.df, insufficientCPAs.newRow)
           }else{
-          
+            ## OTHERWISE, SELECT THE CPAS/ROWS THAT MEET DEMAND
+            
             ## Create field name with scenario name and year
             fieldName <- paste(scen, str_sub(toString(yr),start=-2), sep = "_")
             
             ## if demand is greater than zero, then select sites
             if(MW > 0){
-              ## identify all rows with cumsum values less than or equal to GWh + 1 additional CPA
+              ## flag all rows with cumsum values less than or equal to MW as 1 in the fieldName column, otherwise 0
               rio_bins_pred_sub.selected <- rio_bins_pred_sub %>%
                 mutate(!!fieldName := ifelse(cumsum <= !!MW, 1, 0))
               
@@ -438,50 +417,57 @@ for(scen in scenario.list){
               indexMax.selected <- dim(filter(rio_bins_pred_sub.selected, !!as.name(fieldName) == 1))[1]
               indexMax.all <- dim(rio_bins_pred_sub.selected)[1]
               
-              ## if there are fewer CPAs selected than the available, then select the marginal CPA
+              ## if there are fewer CPAs selected (indexMax.selected) than the supply (indexMax.all), then also flag/select the marginal CPA (the +1 additional CPA)
               if(indexMax.selected < indexMax.all){
-                print("Selecting marginal CPA")
+                print("          Selecting marginal CPA")
                 rio_bins_pred_sub.selected <- rio_bins_pred_sub.selected %>%
                   mutate(!!as.name(fieldName) := ifelse(row_number() == indexMax.selected + 1, 1, !!as.name(fieldName)))
-                ## calculate the residual
+                
+                ## calculate the residual (in this case, positive residual, that is, amount selected that is greater than demand) and add to residuals.df
                 residual <- rio_bins_pred_sub.selected[[indexMax.selected + 1, "cumsum"]] - MW 
                 residuals.df.newRow <- data.frame(scenario = fieldName, zone = zone, 
                                                   bin = bin, residual_MW = residual, residual_percentage = residual/MW)
                 residuals.df <- rbind(residuals.df, residuals.df.newRow)
                 
-              ## if the number of CPAs selected is the amount available, then just calculate the residual
+              ## if the number of CPAs selected is the amount supplied/available, then just calculate the residual (in this case, negative residual. that is, amount selected that is less than demand) and add to residuals.df
               }else if(indexMax.selected == indexMax.all){
-                print("maximum number of CPAs selected, calculate residual")
+                print("          Maximum number of CPAs selected, calculate residual")
                 residual <- rio_bins_pred_sub.selected[[indexMax.selected, "cumsum"]] - MW
                 residuals.df.newRow <- data.frame(scenario = fieldName, zone = zone, 
                                                   bin = bin, residual_MW = residual, residual_percentage = residual/MW)
                 residuals.df <- rbind(residuals.df, residuals.df.newRow)
               }
           
-          ## Otherwise, there is no demand, and assign zeros to all CPAs for this scenario-year combination  
+          ## Otherwise, MW = 0, and there is no demand, and assign zeros to all CPAs for this scenario-year combination  
           }else{
-            print("----> No demand")
+            print("          Demand = 0 for this bin-zone combination")
             rio_bins_pred_sub.selected <- rio_bins_pred_sub %>%
               mutate(!!fieldName := 0)}
           
-          ## select all fieldName == 1
+          ## filter supply df to only those rows that have been selected (all fieldName == 1)
           rio_bins_pred_sub.selected.1 <- filter(rio_bins_pred_sub.selected, UQ(rlang::sym(fieldName)) == 1)
           rio_bins_pred_sub <- rio_bins_pred_sub.selected.1
           } # close loop on if there are CPAs in the bins/supply
-        } ## close loop on if there is demand for this scenario, year, tech, bin and zone
+        }else{print("          There is NO ROW in rio_cap_df for this bin-zone combination")} ## close loop on if there is demand for this scenario, year, tech, bin and zone
     
-        ## add dataframe for this zone-bin combination to a list
-        results.tech.list <- c(results.tech.list, list(rio_bins_pred_sub))
+        ## add dataframe for this zone-bin combination to the selectedRows.allZoneBin.list
+        selectedRows.allZoneBin.list <- c(selectedRows.allZoneBin.list, list(rio_bins_pred_sub))
         
-        # delete variables
-        rm(list = c("rio_bins_pred_sub", "MW", "rio_bins_pred_sub.selected.1", "rio_bins_pred_sub.selected"))
+        # delete variables if they exist
+        #rm(list = c("rio_bins_pred_sub", "MW", "rio_bins_pred_sub.selected.1", "rio_bins_pred_sub.selected"))
+        ifrm(rio_bins_pred_sub)
+        ifrm(MW)
+        ifrm(rio_bins_pred_sub.selected.1)
+        ifrm(rio_bins_pred_sub.selected)
       } ## close bin loop
     } ## close zone loop
     
-    ## after looping through all zones and bins, combine all the selected rows/CPAs for each Tech and scenario
-    selectedCPA_tech_scen <- bind_rows(results.tech.list)
-    ## append to the scenario-wide list 
-    #results.scen.list <- c(results.scen.list, selectedCPA_tech_scen)
+    ######################################
+    ## after looping through all zones and bins, combine all the selected rows/CPAs for each Tech and scenario into a single df
+    selectedCPA_tech_scen <- bind_rows(selectedRows.allZoneBin.list)
+    
+    ######################################
+    # SAVE SELECTED CPAS TO CSV
     ## save technology results to csv
     write.csv(selectedCPA_tech_scen, resultsCSV_tech, row.names=FALSE)
     ## save insufficientCPAs.df to file
@@ -489,8 +475,11 @@ for(scen in scenario.list){
     ## save residuals.df to file
     write.csv(residuals.df, residuals_CSV, row.names=FALSE)
     
+    ######################################
+    # SAVE SELECTED CPAS TO SHAPEFILE
     tic("Saving CPA to shapefile")
     print("Selecting CPAs and writing to shapefile")
+    
     ## join uniqueID to CPA sf object and export results as shapefiles
     selectedCPA_tech_scen <- select(selectedCPA_tech_scen, any_of(c(keepFieldsList, capacityField))) %>%
       mutate(scen = !!fieldName) %>%
@@ -500,42 +489,40 @@ for(scen in scenario.list){
     CPA_3_select <- CPA_3 %>% inner_join(selectedCPA_tech_scen, by = c("UNIQUEID" = "UNIQUEID"))
     
     single_CPA_sf <- dplyr::bind_rows(list(CPA_1_select,CPA_2_select,CPA_3_select))
+    
     ## Save to shapefile
     st_write(single_CPA_sf, resultsSHP_CPA_tech, append=FALSE)
-    rm(single_CPA_sf, CPA_1_select, CPA_2_select, CPA_3_select)
+    rm(single_CPA_sf, CPA_1_select, CPA_2_select, CPA_3_select) ## delete selected CPA polygons from memory
     toc()
     
-    tic("Saving spurs to shapefile")
-    print("Selecting SPURS and writing to shapefile")
-    ## select the spur lines
-    #spurs_1_select <- spurs_1 %>% filter(DestID %in% selectedCPA_tech_scen$UNIQUEID) %>%
-    #  mutate(scen = !!fieldName)
-    #spurs_2_select <- spurs_2 %>% filter(DestID %in% selectedCPA_tech_scen$UNIQUEID) %>%
-    #  mutate(scen = !!fieldName)
-    #single_spurs_sf <- dplyr::bind_rows(list(spurs_1_select,spurs_2_select))
-    spurs_select <- spurs %>% filter(DestID %in% selectedCPA_tech_scen$UNIQUEID) %>%
-      mutate(scen = !!fieldName)
-    ## drop z dimension
-    spurs_select <- st_zm(spurs_select, drop=T, what='ZM')
-    ## Save to shapefile
-    st_write(spurs_select, resultsSHP_spur_tech, append=FALSE)
-    #rm(spurs_1_select, spurs_2_select, single_spurs_sf)
-    rm(spurs_select)
-    toc()
+    # SAVE SPUR LINES TO SHAPEFILE
+    # tic("Saving spurs to shapefile")
+    # print("Selecting SPURS and writing to shapefile")
+    # ## select the spur lines
+    # #spurs_1_select <- spurs_1 %>% filter(DestID %in% selectedCPA_tech_scen$UNIQUEID) %>%
+    # #  mutate(scen = !!fieldName)
+    # #spurs_2_select <- spurs_2 %>% filter(DestID %in% selectedCPA_tech_scen$UNIQUEID) %>%
+    # #  mutate(scen = !!fieldName)
+    # #single_spurs_sf <- dplyr::bind_rows(list(spurs_1_select,spurs_2_select))
+    # spurs_select <- spurs %>% filter(DestID %in% selectedCPA_tech_scen$UNIQUEID) %>%
+    #   mutate(scen = !!fieldName)
+    # ## drop z dimension
+    # spurs_select <- st_zm(spurs_select, drop=T, what='ZM')
+    # ## Save to shapefile
+    # st_write(spurs_select, resultsSHP_spur_tech, append=FALSE)
+    # #rm(spurs_1_select, spurs_2_select, single_spurs_sf)
+    # rm(spurs_select)
+    # toc()
     
+    ######################################
     ## delete variables:
     rm(list = c("rio_cap_sub_loop", "techFN", "rio_bins_pred_tech", "scoreField", "solarCapacityField", "windCapacityField","capacityField"))
     toc()
     
   } ## close tech loop
-  ## bind all the dataframe subsets together by row
-  #selectedCPA_scen <- bind_rows(results.scen.list)
-  ## save scenario results to csv
-  #write.csv(selectedCPA_scen, resultsCSV_scen, row.names=FALSE)
-  
 } ## close scenario loop
-
 ```
+
 
 
 # PLOTS: Generate histograms of SVI distributions for entire  supply curve
@@ -737,19 +724,3 @@ nohsdp_df <- rio_bins_pred_SVI %>%
 
 
 ```
-
-## One-time code
-```{r}
-rio_bins_pred_sub <- select(rio_bins_pred, any_of(c(keepFieldsList)))
-
-CPA_1_select <- CPA_1 %>% inner_join(rio_bins_pred_sub, by = c("UNIQUEID" = "UNIQUEID"))
-CPA_2_select <- CPA_2 %>% inner_join(rio_bins_pred_sub, by = c("UNIQUEID" = "UNIQUEID"))
-CPA_3_select <- CPA_3 %>% inner_join(rio_bins_pred_sub, by = c("UNIQUEID" = "UNIQUEID"))
-
-single_CPA_sf <- dplyr::bind_rows(list(CPA_1_select,CPA_2_select,CPA_3_select))
-## Save to shapefile
-st_write(single_CPA_sf, file.path("../../outputs/", "RIO_CPA_subset", "RIO_CPA_subset_122822.shp"), append=FALSE)
-rm(single_CPA_sf, CPA_1_select, CPA_2_select, CPA_3_select)
-
-```
-
