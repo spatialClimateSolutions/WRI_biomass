@@ -11,12 +11,17 @@ knitr::opts_chunk$set(echo = TRUE)
 library(tidyverse)
 library(readxl)
 library(janitor)
+
+# Henry's google drive filepath:
+#googleDrivefp <- 'G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/'
+
+googleDrivefp <- '/Users/grace/Library/CloudStorage/GoogleDrive-gracecwu@ucsb.edu/My Drive/Research_Projects/WRI_biomass/'
 ```
 
 
 ## Joining county names and fips, parsing state and county
 ```{r}
-zone_mapping <- read_xlsx(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/RIO_data/PreliminaryResults/zone mapping.xlsx'))
+zone_mapping <- read_xlsx(file.path(googleDrivefp, 'RIO_data/PreliminaryResults/zone mapping.xlsx'))
 county_zone <- zone_mapping[1:4]
 county_fips <- zone_mapping[8:9] %>% rename(county = name) %>% drop_na()
 
@@ -84,8 +89,8 @@ unique(zone_mapped %>% group_by(state, county) %>% summarize_at('county_area_pro
 ## Categorizing direct flows energy categories and converting units
 ```{r}
 # Read in demand and category data
-commodity_use <- read.csv(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/RIO_data/FinalResults/commodity_potential_y.csv')) # New file here only has 2021, 2035, 2050 instead of every ten years like we had before
-biomass_feedstocks <- read.csv(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/Downscaling_biomass/intermediateFiles/biomassFeedstocksAndCategories_byScenario_v2.csv'))
+commodity_use <- read.csv(file.path(googleDrivefp, '/RIO_data/FinalResults_June25/commodity_potential.csv')) # New file here only has 2021, 2035, 2050 instead of every ten years like we had before
+biomass_feedstocks <- read.csv(file.path(googleDrivefp, 'Downscaling_biomass/intermediateFiles/biomassFeedstocksAndCategories_byScenario_v3.csv'))
 
 # Select only feedstocks we're interested in and add category variable
 commodity_use <- commodity_use %>%
@@ -126,5 +131,5 @@ direct_flow_county <- merge(zone_mapped, commodity_use, by='zone') %>%
   rename(name = commodity)
   
 # Write output to drive
-write.csv(direct_flow_county, 'G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/Downscaling_biomass/intermediateFiles/commodity_potential_y_county_level.csv', row.names = FALSE)
+write.csv(direct_flow_county, file.path(googleDrivefp, 'Downscaling_biomass/intermediateFiles/commodity_potential_county_level_v2.csv'), row.names = FALSE)
 ```
