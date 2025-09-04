@@ -87,6 +87,12 @@ unique(zone_mapped %>% group_by(state, county) %>% summarize_at('county_area_pro
 commodity_use <- read.csv(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/RIO_data/FinalResults/commodity_potential_y.csv')) # New file here only has 2021, 2035, 2050 instead of every ten years like we had before
 biomass_feedstocks <- read.csv(file.path('G:/.shortcut-targets-by-id/1ZAqlnUns9gmR-USBe5KtSssVU_DgI5Sw/WRI_biomass/Downscaling_biomass/intermediateFiles/biomassFeedstocksAndCategories_byScenario_v2.csv'))
 
+# Add switchgrass-mar in for the restricted scenarios
+biomass_feedstocks <- biomass_feedstocks %>%
+  add_row(category = 'Herbaceous energy crops', unit_conversion_category = 'Everything else', feedstock = 'switchgrass-mar',
+          ira = 'zero', central = 'zero', slow.consumer.uptake = 'zero', central.restrict = 'min_cropland_change (llnl)', 
+          slow.consumer.uptake.restrict = 'min_cropland_change (llnl)', central.COC = 'zero', slow.consumer.uptake.COC = 'zero')
+
 # Select only feedstocks we're interested in and add category variable
 commodity_use <- commodity_use %>%
   filter(commodity %in% unique(biomass_feedstocks$feedstock)) %>%
