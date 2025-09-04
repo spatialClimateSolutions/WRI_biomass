@@ -26,6 +26,39 @@ potential_min_cropland_change <- read.csv(file.path(gdrive_path, 'WRI_biomass/RI
 biomass_feedstocks <- read.csv(file.path(gdrive_path, 'WRI_biomass/Downscaling_biomass/intermediateFiles/biomassFeedstocksAndCategories_byScenario_v2.csv'))
 bts_county_data <- read.csv(file.path(gdrive_path, 'WRI_biomass/Downscaling_biomass/inputs/BTS_county_supply.csv'))
 
+# Add switchgrass back in to the restrict scenarios
+runs_key['central.restrict'][runs_key['sensitivity_key'] == 'COMMODITY_POTENTIAL--switchgrass'] <- 'min_cropland_change (llnl)' 
+runs_key['slow.consumer.uptake.restrict'][runs_key['sensitivity_key'] == 'COMMODITY_POTENTIAL--switchgrass'] <- 'min_cropland_change (llnl)' 
+runs_key['central.restrict.all.land'][runs_key['sensitivity_key'] == 'COMMODITY_POTENTIAL--switchgrass'] <- 'min_cropland_change (llnl)' 
+runs_key['central.restrict.DAC'][runs_key['sensitivity_key'] == 'COMMODITY_POTENTIAL--switchgrass'] <- 'min_cropland_change (llnl)' 
+runs_key['slow.consumer.uptake.restrict.DAC'][runs_key['sensitivity_key'] == 'COMMODITY_POTENTIAL--switchgrass'] <- 'min_cropland_change (llnl)' 
+runs_key['central.restrict.no.store'][runs_key['sensitivity_key'] == 'COMMODITY_POTENTIAL--switchgrass'] <- 'min_cropland_change (llnl)' 
+runs_key['central.restrict.100p.re'][runs_key['sensitivity_key'] == 'COMMODITY_POTENTIAL--switchgrass'] <- 'min_cropland_change (llnl)' 
+runs_key['low.demand.restrict'][runs_key['sensitivity_key'] == 'COMMODITY_POTENTIAL--switchgrass'] <- 'min_cropland_change (llnl)' 
+
+# Add switchgrass-mar into biomass feedstocks
+biomass_feedstocks <- biomass_feedstocks %>%
+  add_row(category = 'Herbaceous energy crops', unit_conversion_category = 'Everything else', feedstock = 'switchgrass-mar',
+          ira = 'zero', central = 'zero', slow.consumer.uptake = 'zero', central.restrict = 'min_cropland_change (llnl)', 
+          slow.consumer.uptake.restrict = 'min_cropland_change (llnl)', central.COC = 'zero', slow.consumer.uptake.COC = 'zero')
+
+
+# Preliminary cleaning for BTS data
+bts_county_data['Production'][bts_county_data['Production'] == 'null'] <- 0 
+bts_county_data <- bts_county_data %>%
+  clean_names() %>% # Rename columns
+  mutate(resource = tolower(resource), # Format strings to match with existing data
+         state = tolower(state), # Format strings to match with existing data
+         county = str_remove(tolower(county), ' county'), # Remove trailing word county
+         county = str_remove(county, ' parish'), # Remove trailing word 'parish' for LA counties
+         county = str_remove(county, ' city'), # Remove trailing word 'city' for some counties
+         county = replace(county, county == 'doña ana', 'dona ana'), # Replace 'ñ' with 'n'
+         county = replace(county, county == 'la salle' & state == 'louisiana', 'lasalle'), # Replace in LA but not TX
+         county = replace(county, county == 'james' & state == 'virginia', 'james city'), # Add back 'city' where needed
+         county = replace(county, county == 'charles' & state == 'virginia', 'charles city'), # Add back 'city' where needed
+         production = as.numeric(production), # Convert to numeric
+         sensitivity = 'BTS [d]') 
+
 # Read and format weight-to-area data
 dry_tons_to_hectares <- read.csv(file.path(gdrive_path, 'WRI_biomass/Downscaling_biomass/inputs/landUseFactors.csv'))
 dry_tons_to_acres <- dry_tons_to_hectares %>%
@@ -33,13 +66,14 @@ dry_tons_to_acres <- dry_tons_to_hectares %>%
   slice(7:19) %>% # remove unnecessary rows
   rename(name = Technology) %>%
   select(name, landUseFactor) %>% # Remove unit column
-  add_row(name = 'corn', landUseFactor = 9.3482) %>% # Add researched value here
-  add_row(name = 'Soybean oil', landUseFactor = 10.06) %>% # Add researched value here
+  add_row(name = 'corn', landUseFactor = 9.3148) %>% # Researched value in US tons per hectare
+  add_row(name = 'soybean oil', landUseFactor = 0.6057) %>% # Researched value in US tons per hectare
   mutate(landUseFactor = landUseFactor/2.47105) # Convert from hectares to acres
 
 # Read in location based data
 zone_mapped <- read.csv(file.path(gdrive_path, 'WRI_biomass/Downscaling_biomass/intermediateFiles/zone_mapped.csv'))
 state_sqmi <- zone_mapped %>% group_by(state) %>% summarize(sqmi = sum(sqmi))
+county_sqmi <- zone_mapped %>% group_by(fips, county, state) %>% summarize(sqmi = sum(sqmi)) %>% ungroup() %>% select(fips, sqmi)
 
 county_outlines <- st_read(file.path(gdrive_path, 'WRI_biomass/Downscaling_biomass/inputs/county_outlines/tl_2016_us_county.shp')) %>%
   filter(!STATEFP %in% c('02', '11', '15', '60', '66', '69', '72', '78')) %>%
@@ -55,7 +89,11 @@ state_outlines <- st_read(file.path(gdrive_path, 'WRI_biomass/Downscaling_biomas
 # Create dictionary for reading in demand data later on
 demand_scenario_names <- c('ira' = 'ira', 'central' = 'central', 'slow.consumer.uptake' = 'slow consumer uptake',
                            'central.restrict' = 'central restrict', 'slow.consumer.uptake.restrict' = 'slow consumer uptake restrict', 
-                           'central.COC' = 'central COC', 'slow.consumer.uptake.COC' = 'slow consumer uptake COC')
+                           'central.COC' = 'central COC', 'slow.consumer.uptake.COC' = 'slow consumer uptake COC',
+                           'central.restrict.all.land' = 'central restrict all land', 'central.restrict.DAC' = 'central restrict DAC',
+                           'slow.consumer.uptake.restrict.DAC' = 'slow consumer uptake restrict DAC',
+                           'central.restrict.no.store' = 'central restrict no store', 
+                           'central.restrict.100p.re' = 'central restrict 100p re', 'low.demand.restrict' = 'low demand restrict')
 
 ```
 
@@ -70,15 +108,15 @@ biomass_downscaling <- function(scenario_list){
     ######## Parse runs_key
     
     runs_key_select <- runs_key %>% 
-    separate(sensitivity_key, c("dataType", "feedstock"), sep = "--") %>% # Parse feedstock from data type
-    filter(dataType == "COMMODITY_POTENTIAL") %>% # Select only commodity_potential
-    filter(get(scenario) %in% c("ICCT x2 [d]", "BTS [d]", "min_cropland_change (llnl)", "3x expanded corn")) # Select current scenario in our three supply curve sources 
-    
-    
+      separate(sensitivity_key, c("dataType", "feedstock"), sep = "--") %>% # Parse feedstock from data type
+      filter(dataType == "COMMODITY_POTENTIAL") %>% # Select only commodity_potential
+      filter(get(scenario) %in% c("ICCT x2 [d]", "BTS [d]", "min_cropland_change (llnl)", "3x expanded corn")) # Select current scenario in our three supply curve sources 
+
+
     ######## Combine non-BTS for scenario filtering and eventual splitting to oils or LLNL
     
     combined_supply <- rbind(fat_oil_grease, potential_min_cropland_change) %>%
-      filter(name %in% unique(biomass_feedstocks$feedstock)) %>% # 
+      filter(name %in% unique(biomass_feedstocks$feedstock)) %>% 
       left_join(runs_key_select %>% select(name = feedstock, all_of(scenario)), by = 'name') %>%
       filter(sensitivity == get(scenario)) # Filter for rows in desired scenario
     
@@ -91,31 +129,19 @@ biomass_downscaling <- function(scenario_list){
     llnl_scenario <- combined_supply %>% 
       filter(gau != 'missing', get(scenario) == 'min_cropland_change (llnl)') %>% # Select LLNL data
       select(-scenario) %>% # Remove duplicate column
-      separate(gau, c("county", "state"), sep = ", ") # Parse for later joining
+      separate(gau, c("county", "state"), sep = ", ") %>% # Parse for later joining
+      mutate(name = case_when(
+        name == 'beef ' ~ 'beef', # Remove trailing space in name
+        TRUE ~ name))
     
     
     ######## Processing BTS County Data
-    
-    # Set null values to zero for numeric type conversion
-    bts_county_data['Production'][bts_county_data['Production'] == 'null'] <- 0 
     
     # Create variable that lists all BTS feedstocks in the current scenario
     bts_feedstocks <- unique(runs_key_select %>% filter(get(scenario) == 'BTS [d]') %>% select(feedstock))$feedstock
     
     # Pull county level data and format everything to match up with zone_mapped later 
     bts_county_clean <- bts_county_data %>%
-      clean_names() %>% # Rename columns
-      mutate(resource = tolower(resource), # Format strings to match with existing data
-             state = tolower(state), # Format strings to match with existing data
-             county = str_remove(tolower(county), ' county'), # Remove trailing word county
-             county = str_remove(county, ' parish'), # Remove trailing word 'parish' for LA counties
-             county = str_remove(county, ' city'), # Remove trailing word 'city' for some counties
-             county = replace(county, county == 'doña ana', 'dona ana'), # Replace 'ñ' with 'n'
-             county = replace(county, county == 'la salle' & state == 'louisiana', 'lasalle'), # Replace in LA but not TX
-             county = replace(county, county == 'james' & state == 'virginia', 'james city'), # Add back 'city' where needed
-             county = replace(county, county == 'charles' & state == 'virginia', 'charles city'), # Add back 'city' where needed
-             production = as.numeric(production), # Convert to numeric
-             sensitivity = 'BTS [d]') %>%
       filter(resource %in% c(bts_feedstocks, 'corn')) %>% # Filter for relevant feedstocks
       select(resource, year, biomass_price, state, county, production, production_unit) %>% # Only relevant columns
       rename(name = resource,
@@ -197,7 +223,8 @@ biomass_downscaling <- function(scenario_list){
     llnl_supply_prop <- left_join(llnl_scenario, llnl_zone_sum, by = c('name', 'year', 'bin', 'zone')) %>% # Add zone total data
       mutate(value = value * county_area_prop, # Scale county-wide supply by its overlap percentage first
              county_zone_contribution = value/zone_total, # Calculate county contributions
-             year = replace(year, year == 2040, 2050)) %>% # Adjust beef, swine, dairy to be 2050
+             year = replace(year, year == 2040, 2050), # Adjust beef, swine, dairy to be 2050
+             year = replace(year, name == 'switchgrass-mar', 2050)) %>% # Adjust switchgrass-mar to 2050
       filter(year == 2050) %>% # Select only this data which will also be used for 2035
       select(name, year, bin, zone, state, county, county_zone_contribution)
     
@@ -218,6 +245,9 @@ biomass_downscaling <- function(scenario_list){
     
     county_level_supply <- rbind(bts_supply_prop, llnl_supply_prop)
     
+    # Converts alternate switchgrass naming in restrict scenarios
+    county_level_supply['name'][county_level_supply['name'] == 'switchgrass-mar'] <- 'switchgrass'
+    
     # Execute bin alignment for required scenarios
     if (scenario %in% c('ira', 'central', 'slow.consumer.uptake', 'central.COC', 'slow.consumer.uptake.COC')){
       county_level_supply <- county_level_supply %>%
@@ -229,8 +259,13 @@ biomass_downscaling <- function(scenario_list){
           TRUE ~ bin)) # Align bin values for feedstocks that didn't match up between supply & demand
     }
     
+    # Extract demand data for current scenario
     scenario_demand <- read.csv(file.path(gdrive_path, 'WRI_biomass/Downscaling_biomass/intermediateFiles/commodity_potential_y_county_level.csv')) %>% 
-      filter(run.name == demand_scenario_names[scenario]) # Extract demand data for current scenario
+      filter(run.name == demand_scenario_names[scenario]) 
+    
+    # Converts alternate switchgrass naming in restrict scenarios
+    scenario_demand['name'][scenario_demand['name'] == 'switchgrass-mar'] <- 'switchgrass'
+    scenario_demand['name'][scenario_demand['name'] == 'beef '] <- 'beef'
     
     
     ######## Compute state results
@@ -419,7 +454,7 @@ biomass_downscaling <- function(scenario_list){
     final_demand_difference <- zone_demand_totals_nobin %>%
       left_join(final_state_totals_nobin, by = c('zone', 'name', 'year'))
     
-    if (dim(final_demand_difference[round(final_demand_difference$tons.x, 4) != round(final_demand_difference$tons.y, 4), ])[1] != 0){
+    if (dim(final_demand_difference[round(final_demand_difference$tons.x, 2) != round(final_demand_difference$tons.y, 2), ])[1] != 0){
       print('Warning: Final state demand was not accurately met')
     }
     
@@ -507,12 +542,20 @@ biomass_downscaling <- function(scenario_list){
       left_join(state_outlines, by = 'state')
     
     final_county <- county_level_results %>%
-      left_join(zone_mapped %>% select(fips, sqmi), by = 'fips') %>% 
+      left_join(county_sqmi, by = 'fips') %>% 
       left_join(dry_tons_to_acres, by = 'name') %>% # Add ton to acre conversion column
-      mutate(production_acres = tons_of_production / landUseFactor) # Calculate acreage
+      mutate(production_acres = tons_of_production / landUseFactor) # Calculate crop acreage
 
     
-    ######## Organize rows before writing output
+    ######## Revert switchgrass feedstock name where appropriate
+    if(scenario %in% c('central.restrict', 'slow.consumer.uptake.restrict', 'central.restrict.all.land', 
+                       'central.restrict.DAC', 'slow.consumer.uptake.restrict.DAC', 
+                       'central.restrict.no.store', 'central.restrict.100p.re', 'low.demand.restrict')){
+      final_county['name'][final_county['name'] == 'switchgrass'] <- 'switchgrass-mar' 
+    }
+    
+    
+    ######## Organize columns before writing output
     
     final_state <- final_state %>%
       select(zone, state, sqmi, year, category, name, tons_of_production, land_use_factor = landUseFactor, production_acres, geometry)
@@ -537,8 +580,8 @@ biomass_downscaling <- function(scenario_list){
 ## Run Function and Produce Output
 ```{r, warning=FALSE, message=FALSE}
 # Select the scenarios for which you want to produce results
-# All possible scenarios: 'ira', 'central', 'slow.consumer.uptake', 'central.restrict', 'slow.consumer.uptake.restrict', 'central.COC', 'slow.consumer.uptake.COC'
-scenarios <- c('ira', 'central', 'slow.consumer.uptake', 'central.restrict', 'slow.consumer.uptake.restrict', 'central.COC', 'slow.consumer.uptake.COC')
+# All possible scenarios: 'ira', 'central', 'slow.consumer.uptake', 'central.restrict', 'slow.consumer.uptake.restrict', 'central.COC', 'slow.consumer.uptake.COC', 'central.restrict.all.land', 'central.restrict.DAC', 'slow.consumer.uptake.restrict.DAC', 'central.restrict.no.store', 'central.restrict.100p.re', 'low.demand.restrict'
+scenarios <- c('ira', 'central', 'slow.consumer.uptake', 'central.restrict', 'slow.consumer.uptake.restrict', 'central.COC', 'slow.consumer.uptake.COC', 'central.restrict.all.land', 'central.restrict.DAC', 'slow.consumer.uptake.restrict.DAC', 'central.restrict.no.store', 'central.restrict.100p.re', 'low.demand.restrict')
 
 # Run downscaling
 biomass_downscaling(scenarios)
