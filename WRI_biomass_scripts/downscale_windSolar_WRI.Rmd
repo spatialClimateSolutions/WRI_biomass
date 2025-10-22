@@ -57,13 +57,14 @@ Pseudo-code/outline
 ```{r}
 ## NOTE: currently programmed to select the highest scores first within each bin
 sortBy <- "highest" # "lowest" (for LCOE); "highest" for random forest and other machine learning prediction
-date <- "012524"
-supplyScen <- "base" ## either "base" or "restricted" depending on the RIO scenario 
+date <- "102125"
+supplyScen <- "restricted" ## either "base" or "restricted" depending on the RIO scenario 
 
 ## main google shared folder path containing inputs and outputs
 google_fp <- "/Users/grace/Library/CloudStorage/GoogleDrive-gracecwu@ucsb.edu/My Drive/Research_Projects/WRI_biomass"
-popNat_google_fp <- "/Users/grace/Library/CloudStorage/GoogleDrive-gracecwu@ucsb.edu/Shared drives/PoP_National/PoPNational_Data/0_Deliverables/multiTech_supplyCurve/Sept2023_updated"
-rioResultsFolder_fp <- file.path(google_fp, "RIO_data/PreliminaryResults2")
+popNat_google_fp <- "/Users/grace/Library/CloudStorage/GoogleDrive-gracecwu@ucsb.edu/Shared drives/PoP_National/PoPNational_Data/0_Deliverables/multiTech_supplyCurve/Sept2023_updated" # <-- for the CPA shapefile locations
+rioResultsFolder_fp <- file.path(google_fp, "RIO_data/FinalResults_June25")
+rioResultsFolder_preliminaryResults_fp <- file.path(google_fp, "RIO_data/PreliminaryResults2")
 
 #mergedCPAs_folderName <- "mergedCPAs_focalStats_v2"
 # zonalStats_folderName <- "zonalStatsCSVs_focalStats_v2"
@@ -72,7 +73,7 @@ rioResultsFolder_fp <- file.path(google_fp, "RIO_data/PreliminaryResults2")
 # rf_field_wind <- "rf_pl_wind"
 
 ## outputs folders:
-outputsFolder <- file.path(google_fp, paste0("Downscaling_windSolar/downscaling_outputs/results_", date))
+outputsFolder <- file.path(google_fp, paste0("Downscaling_windSolar/downscaling_outputs/results_", date, "_", "NEWpredSurfaces" , "_", supplyScen))
 outputsFolder_csv <- file.path(outputsFolder, paste0("csvs_", date))
 outputsFolder_shp <- file.path(outputsFolder, paste0("shp_", date))
 outputsFolder_diagnostics <- file.path(outputsFolder, paste0("diagnostics_", date))
@@ -105,20 +106,22 @@ keepFieldsList <- c("ID", "STATE_sub", "tot_txCost", "UNIQUEID", "CF_wind", "CF_
 # IMPORT PREDICTION SURFACES
 
 ## Wind and solar prediction surface file paths
-pred_PV <- rast(file.path(google_fp, "Downscaling_windSolar/downscaling_inputs/Wind_solar_predictionSurfaces/pred_randomForest_noRegion_solar_2017_ptLoc.tif"))
+#pred_PV <- rast(file.path(google_fp, "Downscaling_windSolar/downscaling_inputs/Wind_solar_predictionSurfaces/pred_randomForest_noRegion_solar_2017_ptLoc.tif"))
+pred_PV <- rast("/Users/grace/Documents/WRI_biomass/wind_solar_pred_surfaces_Sept2025/pred_randomForest_s.tif")
 
 #pred_wind <- rast(file.path(google_fp, "Downscaling_windSolar/downscaling_inputs/Wind_solar_predictionSurfaces/pred_randomForest_wind.csv")) 
-pred_wind <- rast("/Users/grace/Documents/PoP_national/Downscaling/spatialInputs/randomForest_noregion_wPlannedTx_wind_2017.tif")
+#pred_wind <- rast("/Users/grace/Documents/PoP_national/Downscaling/spatialInputs/randomForest_noregion_wPlannedTx_wind_2017.tif")
+pred_wind <- rast("/Users/grace/Documents/WRI_biomass/wind_solar_pred_surfaces_Sept2025/pred_randomForest_w.tif")
 
 #######################
 # IMPORT RIO RESULTS
 ## Import RIO capacity results
-rio_cap <- read.csv(file.path(rioResultsFolder_fp, "capacity_y.csv"))
+rio_cap <- read.csv(file.path(rioResultsFolder_fp, "capacity.csv"))
 head(rio_cap)
 rio_tech_list <- unique(rio_cap$tech)
 
 ## Import RIO resource bins 
-rio_bins <- read.csv(file.path(rioResultsFolder_fp, "binned_resource_df", paste0("binned_resource_df_", supplyScen,".csv")))
+rio_bins <- read.csv(file.path(rioResultsFolder_preliminaryResults_fp, "binned_resource_df", paste0("binned_resource_df_", supplyScen,".csv")))
 colnames(rio_bins)
 
 #######################
@@ -289,11 +292,33 @@ WRI SETUP:
 ## Set inputs
 ```{r}
 ## set year
-yr = 2050
+yr = 2035
 
 ## set scenarios and their abbreviated names
 scenario.list <- unique(rio_cap$run.name)
-names(scenario.list) <- c("ira", "central", "slow", "centralRes", "slowRes", "centralCOC", "slowCOC")
+names(scenario.list) <- c("ira", "central", "slow", 
+                          "centralRes", "slowRes", "centralCOC", 
+                          "slowCOC", "cenResAll", "cenResDAC",
+                          "slowResDAC", "cenResNo", "cenRes100",
+                          "lowRes", "cenRes_v2")
+
+if(supplyScen == "restricted"){
+  scenario.list.short <- c("ira", "central", "slow consumer uptake", 
+                           "central restrict", "slow consumer uptake restrict", "central COC",
+                           "slow consumer uptake COC", "central restrict DAC",
+                           "slow consumer uptake restrict DAC", "central restrict no store", "central restrict 100p re",
+                           "low demand restrict", "central restrict v2")
+  names(scenario.list.short) <- c("ira", "central", "slow", 
+                          "centralRes", "slowRes", "centralCOC", 
+                          "slowCOC", "cenResDAC",
+                          "slowResDAC", "cenResNo", "cenRes100",
+                          "lowRes", "cenRes_v2")
+}
+if(supplyScen == "base"){
+  scenario.list.short <- c("central restrict all land")
+  names(scenario.list.short) <- c("cenResAll")
+}
+
 
 ## function that removes object if it exists
 ifrm <- function(obj, env = globalenv()) {
